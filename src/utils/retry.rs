@@ -336,6 +336,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fmt;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Test error type that implements std::error::Error
+    #[derive(Debug)]
+    struct TestError(String);
+
+    impl fmt::Display for TestError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "{}", self.0)
+        }
+    }
+
+    impl std::error::Error for TestError {}
 
     #[test]
     fn test_retry_config_default() {
@@ -398,18 +413,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_success() {
-        let mut attempt = 0;
+        let attempt = Arc::new(AtomicUsize::new(0));
         let config = RetryConfig::new().with_max_retries(3);
+        let attempt_clone = Arc::clone(&attempt);
 
         let result = retry_with_condition(
             config,
-            |_: &anyhow::Error| true,
-            || async {
-                attempt += 1;
-                if attempt < 3 {
-                    Err(anyhow!("Temporary error"))
-                } else {
-                    Ok("Success")
+            |_: &TestError| true,
+            move || {
+                let attempt = Arc::clone(&attempt_clone);
+                async move {
+                    let current = attempt.fetch_add(1, Ordering::SeqCst) + 1;
+                    if current < 3 {
+                        Err(TestError("Temporary error".to_string()))
+                    } else {
+                        Ok("Success")
+                    }
                 }
             },
         )
@@ -417,44 +436,52 @@ mod tests {
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "Success");
-        assert_eq!(attempt, 3);
+        assert_eq!(attempt.load(Ordering::SeqCst), 3);
     }
 
     #[tokio::test]
     async fn test_retry_failure() {
-        let mut attempt = 0;
+        let attempt = Arc::new(AtomicUsize::new(0));
         let config = RetryConfig::new().with_max_retries(2);
+        let attempt_clone = Arc::clone(&attempt);
 
         let result = retry_with_condition(
             config,
-            |_: &anyhow::Error| true,
-            || async {
-                attempt += 1;
-                Err::<(), _>(anyhow!("Permanent error"))
+            |_: &TestError| true,
+            move || {
+                let attempt = Arc::clone(&attempt_clone);
+                async move {
+                    attempt.fetch_add(1, Ordering::SeqCst);
+                    Err::<(), _>(TestError("Permanent error".to_string()))
+                }
             },
         )
         .await;
 
         assert!(result.is_err());
-        assert_eq!(attempt, 3); // Initial attempt + 2 retries
+        assert_eq!(attempt.load(Ordering::SeqCst), 3); // Initial attempt + 2 retries
     }
 
     #[tokio::test]
     async fn test_retry_no_retry_on_condition() {
-        let mut attempt = 0;
+        let attempt = Arc::new(AtomicUsize::new(0));
         let config = RetryConfig::new().with_max_retries(3);
+        let attempt_clone = Arc::clone(&attempt);
 
         let result = retry_with_condition(
             config,
-            |err: &anyhow::Error| !err.to_string().contains("permanent"),
-            || async {
-                attempt += 1;
-                Err::<(), _>(anyhow!("permanent error"))
+            |err: &TestError| !err.0.contains("permanent"),
+            move || {
+                let attempt = Arc::clone(&attempt_clone);
+                async move {
+                    attempt.fetch_add(1, Ordering::SeqCst);
+                    Err::<(), _>(TestError("permanent error".to_string()))
+                }
             },
         )
         .await;
 
         assert!(result.is_err());
-        assert_eq!(attempt, 1); // Only initial attempt, no retries
+        assert_eq!(attempt.load(Ordering::SeqCst), 1); // Only initial attempt, no retries
     }
 }

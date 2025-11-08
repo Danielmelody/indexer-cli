@@ -407,10 +407,10 @@ mod tests {
     #[test]
     fn test_validate_urls() {
         let urls = vec!["https://example.com", "https://test.com"];
-        assert!(validate_urls(&urls).is_ok());
+        assert!(validate_urls(urls).is_ok());
 
         let invalid_urls = vec!["https://example.com", "not-a-url"];
-        assert!(validate_urls(&invalid_urls).is_err());
+        assert!(validate_urls(invalid_urls).is_err());
     }
 
     #[test]
