@@ -105,6 +105,9 @@ tendril = "0.4"
 validator = "0.20"
 validator_derive = "0.20"
 
+# Signal handling
+ctrlc = "3.4"
+
 [dev-dependencies]
 criterion = "0.7"
 mockall = "0.13"
