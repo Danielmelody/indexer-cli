@@ -701,6 +701,22 @@ pub struct ValidateArgs {
     #[arg(long)]
     pub check_key_file: bool,
 
+    /// Check actual connectivity to APIs
+    #[arg(long)]
+    pub check_connectivity: bool,
+
+    /// Check that referenced files exist
+    #[arg(long)]
+    pub check_files: bool,
+
+    /// Check file permissions
+    #[arg(long)]
+    pub check_permissions: bool,
+
+    /// Fail on warnings, not just errors
+    #[arg(long)]
+    pub strict: bool,
+
     /// Output format
     #[arg(short = 'o', long, default_value = "text")]
     pub format: OutputFormat,
