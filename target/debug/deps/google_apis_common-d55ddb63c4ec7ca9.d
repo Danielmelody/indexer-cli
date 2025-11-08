@@ -1,0 +1,9 @@
+/Users/danielhu/Projects/indexer-cli-worktrees/feature-history/target/debug/deps/google_apis_common-d55ddb63c4ec7ca9.d: /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/lib.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/auth.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/field_mask.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/serde.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/url.rs
+
+/Users/danielhu/Projects/indexer-cli-worktrees/feature-history/target/debug/deps/libgoogle_apis_common-d55ddb63c4ec7ca9.rmeta: /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/lib.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/auth.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/field_mask.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/serde.rs /Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/url.rs
+
+/Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/lib.rs:
+/Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/auth.rs:
+/Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/field_mask.rs:
+/Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/serde.rs:
+/Users/danielhu/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/google-apis-common-7.0.0/src/url.rs:
