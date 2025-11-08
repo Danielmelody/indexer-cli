@@ -1452,6 +1452,7 @@ dependencies = [
  "criterion",
  "dirs",
  "dotenvy",
+ "flate2",
  "futures",
  "google-indexing3",
  "html5ever",
