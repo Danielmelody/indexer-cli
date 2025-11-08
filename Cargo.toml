@@ -1,0 +1,119 @@
+[package]
+name = "indexer-cli"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT"
+description = "A CLI tool for managing search engine indexing workflows"
+repository = "https://github.com/your-username/indexer-cli"
+keywords = ["cli", "indexing", "search", "seo", "sitemap"]
+categories = ["command-line-utilities", "web-programming"]
+
+[[bin]]
+name = "indexer-cli"
+path = "src/main.rs"
+
+[lib]
+name = "indexer_cli"
+path = "src/lib.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.5", features = ["derive", "env"] }
+clap_complete = "4.5"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
+
+# Async runtime
+tokio = { version = "1.47", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# XML parsing
+quick-xml = "0.37"
+roxmltree = "0.20"
+
+# Database
+rusqlite = { version = "0.37", features = ["bundled", "chrono"] }
+
+# Google API auth
+yup-oauth2 = "12.1"
+google-indexing3 = "6.0"
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+# Utilities
+url = "2.5"
+regex = "1.12"
+rand = "0.9"
+sha2 = "0.10"
+base64 = "0.22"
+percent-encoding = "2.3"
+
+# Progress bars
+indicatif = "0.18"
+
+# Colored output
+console = "0.16"
+colored = "2.1"
+
+# Configuration
+config = "0.15"
+dotenvy = "0.15"
+
+# File operations
+tempfile = "3.20"
+walkdir = "2.5"
+mime = "0.3"
+
+# Web scraping
+scraper = "0.24"
+selectors = "0.32"
+
+# HTML parsing
+html5ever = "0.35"
+markup5ever = "0.14"
+
+tendril = "0.4"
+
+# Validation
+validator = "0.20"
+validator_derive = "0.20"
+
+[dev-dependencies]
+criterion = "0.7"
+mockall = "0.13"
+serial_test = "3.2"
+tempfile = "3.20"
+wiremock = "0.6"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.test]
+opt-level = 1
+debug = true

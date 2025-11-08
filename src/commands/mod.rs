@@ -1,0 +1,10 @@
+// Commands module
+pub mod init;
+pub mod config;
+pub mod google;
+pub mod indexnow;
+pub mod submit;
+pub mod sitemap;
+pub mod history;
+pub mod watch;
+pub mod validate;
