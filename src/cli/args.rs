@@ -235,7 +235,7 @@ pub struct GoogleStatusArgs {
     pub file: Option<PathBuf>,
 
     /// Output format
-    #[arg(short, long, default_value = "text")]
+    #[arg(short = 'o', long, default_value = "text")]
     pub format: OutputFormat,
 }
 
