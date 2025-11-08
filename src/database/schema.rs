@@ -114,7 +114,7 @@ pub fn init_database(db_path: &Path) -> Result<Connection, IndexerError> {
 }
 
 /// Create the schema_version table
-fn create_schema_version_table(conn: &Connection) -> Result<(), IndexerError> {
+pub(crate) fn create_schema_version_table(conn: &Connection) -> Result<(), IndexerError> {
     debug!("Creating schema_version table");
 
     conn.execute(CREATE_SCHEMA_VERSION_TABLE, [])
