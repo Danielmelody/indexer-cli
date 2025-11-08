@@ -6,7 +6,7 @@
 //! - File paths
 //! - Date formats
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{bail, Context, Result};
 use chrono::NaiveDate;
 use regex::Regex;
 use std::path::{Path, PathBuf};

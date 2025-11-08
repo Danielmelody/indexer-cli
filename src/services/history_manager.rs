@@ -7,9 +7,8 @@
 use crate::database::{
     models::{ActionType, ApiType, SubmissionRecord, SubmissionStatus},
     queries::{
-        check_url_submitted, count_submissions, delete_old_submissions, get_submission_by_url,
+        check_url_submitted, count_submissions, delete_old_submissions,
         get_submissions_stats, insert_submission, list_submissions, SubmissionFilters,
-        SubmissionStats as DbSubmissionStats,
     },
     schema::init_database,
 };
@@ -141,7 +140,7 @@ impl HistoryManager {
     }
 
     /// Get a database connection (with automatic reconnection if needed)
-    fn get_connection(&self) -> Result<std::sync::MutexGuard<Connection>, IndexerError> {
+    fn get_connection(&self) -> Result<std::sync::MutexGuard<'_, Connection>, IndexerError> {
         self.connection.lock().map_err(|e| {
             IndexerError::DatabaseConnectionFailed {
                 message: format!("Failed to acquire database lock: {}", e),
@@ -263,7 +262,7 @@ impl HistoryManager {
     ) -> Result<usize, IndexerError> {
         info!("Recording batch of {} submissions", records.len());
 
-        let conn = self.get_connection()?;
+        let mut conn = self.get_connection()?;
 
         // Start transaction
         let tx = conn

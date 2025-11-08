@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
+use hyper_util::client::legacy::connect::HttpConnector;
 use yup_oauth2::{
     authenticator::Authenticator, hyper_rustls::HttpsConnector, ServiceAccountAuthenticator,
 };
@@ -66,36 +67,36 @@ struct UrlNotification {
 
 /// Latest update information
 #[derive(Debug, Clone, Deserialize)]
-struct LatestUpdate {
+pub struct LatestUpdate {
     /// The URL that was updated
-    url: String,
+    pub url: String,
     /// The type of notification
     #[serde(rename = "type")]
-    notification_type: String,
+    pub notification_type: String,
     /// The time when the notification was sent
     #[serde(rename = "notifyTime")]
-    notify_time: Option<String>,
+    pub notify_time: Option<String>,
 }
 
 /// URL notification metadata
 #[derive(Debug, Clone, Deserialize)]
-struct UrlNotificationMetadata {
+pub struct UrlNotificationMetadata {
     /// The URL
-    url: String,
+    pub url: String,
     /// Latest update information
     #[serde(rename = "latestUpdate")]
-    latest_update: Option<LatestUpdate>,
+    pub latest_update: Option<LatestUpdate>,
     /// Latest remove information (for deleted URLs)
     #[serde(rename = "latestRemove")]
-    latest_remove: Option<LatestUpdate>,
+    pub latest_remove: Option<LatestUpdate>,
 }
 
 /// URL notification response
 #[derive(Debug, Clone, Deserialize)]
-struct UrlNotificationResponse {
+pub struct UrlNotificationResponse {
     /// URL notification metadata
     #[serde(rename = "urlNotificationMetadata")]
-    url_notification_metadata: UrlNotificationMetadata,
+    pub url_notification_metadata: UrlNotificationMetadata,
 }
 
 /// Metadata response for get_metadata operation
@@ -186,9 +187,7 @@ pub struct GoogleIndexingClient {
     /// HTTP client
     client: reqwest::Client,
     /// OAuth2 authenticator
-    auth: Arc<Mutex<Authenticator<HttpsConnector<hyper::client::HttpConnector>>>>,
-    /// Service account file path
-    service_account_path: PathBuf,
+    auth: Arc<Mutex<Authenticator<HttpsConnector<HttpConnector>>>>,
     /// Rate limiter
     rate_limiter: Arc<Mutex<RateLimiter>>,
     /// Daily publish limit
@@ -207,6 +206,14 @@ impl GoogleIndexingClient {
     /// # Returns
     ///
     /// Returns a Result containing the client or an error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The service account file does not exist
+    /// - The service account file is invalid or malformed
+    /// - The HTTP client cannot be created
+    /// - Authentication with Google OAuth2 fails
     ///
     /// # Examples
     ///
@@ -247,7 +254,6 @@ impl GoogleIndexingClient {
         Ok(Self {
             client,
             auth: Arc::new(Mutex::new(auth)),
-            service_account_path,
             rate_limiter: Arc::new(Mutex::new(RateLimiter::new(
                 DEFAULT_RATE_LIMIT_PER_MINUTE,
             ))),
@@ -264,6 +270,14 @@ impl GoogleIndexingClient {
     /// * `daily_publish_limit` - Daily publish limit
     /// * `rate_limit_per_minute` - Rate limit per minute
     /// * `batch_size` - Batch size for batch operations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The service account file does not exist
+    /// - The service account file is invalid or malformed
+    /// - The HTTP client cannot be created
+    /// - Authentication with Google OAuth2 fails
     pub async fn with_config(
         service_account_path: PathBuf,
         daily_publish_limit: usize,
@@ -280,7 +294,7 @@ impl GoogleIndexingClient {
     /// Create OAuth2 authenticator from service account file
     async fn create_authenticator(
         service_account_path: &PathBuf,
-    ) -> Result<Authenticator<HttpsConnector<hyper::client::HttpConnector>>, IndexerError> {
+    ) -> Result<Authenticator<HttpsConnector<HttpConnector>>, IndexerError> {
         // Read service account key
         let service_account_key = yup_oauth2::read_service_account_key(&service_account_path)
             .await
@@ -304,6 +318,12 @@ impl GoogleIndexingClient {
     /// # Returns
     ///
     /// Returns the access token or an error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The OAuth2 token request fails
+    /// - No access token is returned by the authentication service
     pub async fn authenticate(&self) -> Result<String, IndexerError> {
         debug!("Authenticating with Google OAuth2");
 
@@ -335,6 +355,15 @@ impl GoogleIndexingClient {
     /// # Returns
     ///
     /// Returns the submission result or an error
+    ///
+    /// # Errors
+    ///
+    /// This function converts errors into unsuccessful submission results instead of
+    /// propagating them. It returns `Ok(SubmissionResult)` with `success: false` if:
+    /// - Authentication fails
+    /// - The HTTP request fails
+    /// - The API returns an error response
+    /// - The request times out or is retried unsuccessfully
     ///
     /// # Examples
     ///
@@ -377,7 +406,7 @@ impl GoogleIndexingClient {
         let access_token = self.authenticate().await?;
 
         // Build request URL
-        let request_url = format!("{}/urlNotifications:publish", GOOGLE_INDEXING_API_ENDPOINT);
+        let request_url = format!("{GOOGLE_INDEXING_API_ENDPOINT}/urlNotifications:publish");
 
         // Make request with retry logic
         let retry_config = RetryConfig::new()
@@ -392,7 +421,7 @@ impl GoogleIndexingClient {
                 let response = self
                     .client
                     .post(&request_url)
-                    .header("Authorization", format!("Bearer {}", access_token))
+                    .header("Authorization", format!("Bearer {access_token}"))
                     .header("Content-Type", "application/json")
                     .json(&notification)
                     .send()
@@ -407,7 +436,7 @@ impl GoogleIndexingClient {
                 // Handle response
                 match status_code {
                     StatusCode::OK => {
-                        let response_body: UrlNotificationResponse =
+                        let _response_body: UrlNotificationResponse =
                             response.json().await.map_err(|e| {
                                 IndexerError::JsonDeserializationError {
                                     message: e.to_string(),
@@ -444,7 +473,7 @@ impl GoogleIndexingClient {
                         let error_text = response.text().await.unwrap_or_default();
                         Err(IndexerError::GoogleApiError {
                             status_code: status_code_u16,
-                            message: format!("Server error: {}", error_text),
+                            message: format!("Server error: {error_text}"),
                         })
                     }
                     _ => {
@@ -459,19 +488,16 @@ impl GoogleIndexingClient {
         )
         .await;
 
-        match result {
-            Ok(submission_result) => Ok(submission_result),
-            Err(e) => {
-                error!("Failed to publish URL {}: {}", url, e);
-                Ok(SubmissionResult {
-                    url: url.to_string(),
-                    success: false,
-                    status_code: None,
-                    message: e.to_string(),
-                    submitted_at: Utc::now(),
-                })
-            }
-        }
+        result.or_else(|e| {
+            error!("Failed to publish URL {}: {}", url, e);
+            Ok(SubmissionResult {
+                url: url.to_string(),
+                success: false,
+                status_code: None,
+                message: e.to_string(),
+                submitted_at: Utc::now(),
+            })
+        })
     }
 
     /// Submit multiple URLs in batches
@@ -484,6 +510,13 @@ impl GoogleIndexingClient {
     /// # Returns
     ///
     /// Returns the batch submission result
+    ///
+    /// # Errors
+    ///
+    /// This function does not return errors directly. Individual URL submission failures
+    /// are captured in the `BatchSubmissionResult` with detailed error information for
+    /// each failed URL. The function only returns `Err` if there's a catastrophic failure
+    /// before any submissions can begin.
     ///
     /// # Examples
     ///
@@ -527,7 +560,7 @@ impl GoogleIndexingClient {
             info!(
                 "Processing batch {}/{} ({} URLs)",
                 batch_idx + 1,
-                (total + self.batch_size - 1) / self.batch_size,
+                total.div_ceil(self.batch_size),
                 batch.len()
             );
 
@@ -546,7 +579,7 @@ impl GoogleIndexingClient {
                         error!("Failed to submit URL {}: {}", url, e);
                         failed += 1;
                         results.push(SubmissionResult {
-                            url: url.to_string(),
+                            url: url.clone(),
                             success: false,
                             status_code: None,
                             message: e.to_string(),
@@ -557,7 +590,7 @@ impl GoogleIndexingClient {
             }
 
             // Add a small delay between batches to avoid overwhelming the API
-            if batch_idx < (total + self.batch_size - 1) / self.batch_size - 1 {
+            if batch_idx < total.div_ceil(self.batch_size) - 1 {
                 tokio::time::sleep(Duration::from_millis(100)).await;
             }
         }
@@ -584,6 +617,15 @@ impl GoogleIndexingClient {
     /// # Returns
     ///
     /// Returns the metadata response or an error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Authentication fails
+    /// - The HTTP request fails
+    /// - The URL is not found in the indexing database
+    /// - Permission is denied for the URL
+    /// - The API returns any other error response
     ///
     /// # Examples
     ///
@@ -626,7 +668,7 @@ impl GoogleIndexingClient {
         let response = self
             .client
             .get(&request_url)
-            .header("Authorization", format!("Bearer {}", access_token))
+            .header("Authorization", format!("Bearer {access_token}"))
             .send()
             .await
             .map_err(|e| IndexerError::HttpRequestFailed {
@@ -674,6 +716,11 @@ impl GoogleIndexingClient {
     /// # Returns
     ///
     /// Returns quota information
+    ///
+    /// # Errors
+    ///
+    /// This function currently never returns an error, but the signature supports
+    /// potential future implementations that might query external quota tracking systems.
     pub async fn check_quota(&self) -> Result<QuotaInfo, IndexerError> {
         info!("Checking quota (local tracking)");
 

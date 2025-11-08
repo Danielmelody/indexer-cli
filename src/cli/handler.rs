@@ -43,69 +43,72 @@ pub async fn handle_command(cli: Cli) -> Result<()> {
         colored::control::set_override(false);
     }
 
+    // Extract verbose flag before matching
+    let verbose = cli.verbose;
+
     // Dispatch to the appropriate command handler
     match cli.command {
-        Commands::Init(args) => {
-            if cli.verbose {
+        Commands::Init(ref args) => {
+            if verbose {
                 println!("{}", "Running init command...".cyan());
             }
-            commands::init::run(args, &cli).await
+            commands::init::run(args.clone(), &cli).await
         }
 
-        Commands::Config(args) => {
-            if cli.verbose {
+        Commands::Config(ref args) => {
+            if verbose {
                 println!("{}", "Running config command...".cyan());
             }
-            commands::config::run(args, &cli).await
+            commands::config::run(args.clone(), &cli).await
         }
 
-        Commands::Google(args) => {
-            if cli.verbose {
+        Commands::Google(ref args) => {
+            if verbose {
                 println!("{}", "Running google command...".cyan());
             }
-            commands::google::run(args, &cli).await
+            commands::google::run(args.clone(), &cli).await
         }
 
-        Commands::IndexNow(args) => {
-            if cli.verbose {
+        Commands::IndexNow(ref args) => {
+            if verbose {
                 println!("{}", "Running indexnow command...".cyan());
             }
-            commands::indexnow::run(args, &cli).await
+            commands::indexnow::run(args.clone(), &cli).await
         }
 
-        Commands::Submit(args) => {
-            if cli.verbose {
+        Commands::Submit(ref args) => {
+            if verbose {
                 println!("{}", "Running submit command...".cyan());
             }
-            commands::submit::run(args, &cli).await
+            commands::submit::run(args.clone(), &cli).await
         }
 
-        Commands::Sitemap(args) => {
-            if cli.verbose {
+        Commands::Sitemap(ref args) => {
+            if verbose {
                 println!("{}", "Running sitemap command...".cyan());
             }
-            commands::sitemap::run(args, &cli).await
+            commands::sitemap::run(args.clone(), &cli).await
         }
 
-        Commands::History(args) => {
-            if cli.verbose {
+        Commands::History(ref args) => {
+            if verbose {
                 println!("{}", "Running history command...".cyan());
             }
-            commands::history::run(args, &cli).await
+            commands::history::run(args.clone(), &cli).await
         }
 
-        Commands::Watch(args) => {
-            if cli.verbose {
+        Commands::Watch(ref args) => {
+            if verbose {
                 println!("{}", "Running watch command...".cyan());
             }
-            commands::watch::run(args, &cli).await
+            commands::watch::run(args.clone(), &cli).await
         }
 
-        Commands::Validate(args) => {
-            if cli.verbose {
+        Commands::Validate(ref args) => {
+            if verbose {
                 println!("{}", "Running validate command...".cyan());
             }
-            commands::validate::run(args, &cli).await
+            commands::validate::run(args.clone(), &cli).await
         }
     }
 }

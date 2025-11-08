@@ -96,7 +96,7 @@ impl RetryConfig {
         // Add jitter if enabled (randomize ±25%)
         if self.jitter {
             use rand::Rng;
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             let jitter_factor = rng.gen_range(0.75..=1.25);
             duration = Duration::from_millis((duration.as_millis() as f64 * jitter_factor) as u64);
         }

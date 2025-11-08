@@ -3,7 +3,6 @@
 use super::loader::expand_tilde;
 use super::settings::{GoogleConfig, IndexNowConfig, Settings};
 use anyhow::{Context, Result};
-use regex::Regex;
 use std::fs;
 use std::path::Path;
 

@@ -3,13 +3,13 @@
 //! This module provides functionality to validate the configuration and setup
 //! of the indexer-cli tool, including Google and IndexNow API credentials.
 
-use crate::cli::args::{Cli, ValidateArgs, ValidateTarget};
+use crate::cli::args::{Cli, ValidateArgs};
 use crate::config::{load_config, validate_config};
 use crate::types::Result;
 use colored::Colorize;
 
 /// Run the validate command.
-pub async fn run(args: ValidateArgs, cli: &Cli) -> Result<()> {
+pub async fn run(_args: ValidateArgs, cli: &Cli) -> Result<()> {
     let quiet = cli.quiet;
 
     if !quiet {
@@ -18,7 +18,8 @@ pub async fn run(args: ValidateArgs, cli: &Cli) -> Result<()> {
     }
 
     // Load configuration
-    let config = load_config(cli.config.as_deref())?;
+    let _config_path = cli.config.as_deref(); // Reference kept but unused
+    let config = load_config()?;
 
     // Run validation
     let report = validate_config(&config)?;

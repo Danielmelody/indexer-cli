@@ -8,6 +8,7 @@
 //! - Size and URL count validation
 
 use crate::types::error::IndexerError;
+use async_recursion::async_recursion;
 use chrono::{DateTime, Utc};
 use regex::Regex;
 use reqwest::Client;
@@ -196,6 +197,7 @@ impl SitemapParser {
     }
 
     /// Parse sitemap XML content
+    #[async_recursion]
     async fn parse_sitemap_content(
         &self,
         xml_content: &str,
@@ -243,7 +245,7 @@ impl SitemapParser {
     /// Parse a sitemap index and recursively fetch all child sitemaps
     async fn parse_sitemap_index(
         &self,
-        doc: &Document,
+        doc: &Document<'_>,
         filters: Option<&SitemapFilters>,
         depth: usize,
     ) -> Result<ParseResult, IndexerError> {
@@ -263,36 +265,36 @@ impl SitemapParser {
         for sitemap_url in sitemap_locs {
             debug!("Parsing child sitemap: {}", sitemap_url);
 
-            match self.download_sitemap(&sitemap_url).await {
-                Ok(xml_content) => {
-                    match self
-                        .parse_sitemap_content(&xml_content, filters, depth + 1)
-                        .await
-                    {
-                        Ok(result) => {
-                            total_count += result.total_count;
-                            all_urls.extend(result.urls);
-
-                            // Check URL limit
-                            if all_urls.len() > self.max_urls {
-                                warn!(
-                                    "Reached maximum URL limit of {}, stopping",
-                                    self.max_urls
-                                );
-                                all_urls.truncate(self.max_urls);
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            warn!("Failed to parse child sitemap {}: {}", sitemap_url, e);
-                            continue;
-                        }
-                    }
-                }
+            let xml_content = match self.download_sitemap(&sitemap_url).await {
+                Ok(content) => content,
                 Err(e) => {
                     warn!("Failed to download child sitemap {}: {}", sitemap_url, e);
                     continue;
                 }
+            };
+
+            let result = match self
+                .parse_sitemap_content(&xml_content, filters, depth + 1)
+                .await
+            {
+                Ok(result) => result,
+                Err(e) => {
+                    warn!("Failed to parse child sitemap {}: {}", sitemap_url, e);
+                    continue;
+                }
+            };
+
+            total_count += result.total_count;
+            all_urls.extend(result.urls);
+
+            // Check URL limit
+            if all_urls.len() > self.max_urls {
+                warn!(
+                    "Reached maximum URL limit of {}, stopping",
+                    self.max_urls
+                );
+                all_urls.truncate(self.max_urls);
+                break;
             }
         }
 

@@ -162,16 +162,15 @@ pub fn init_logger(config: LoggerConfig) -> Result<()> {
         .with_default_directive(config.level.into())
         .from_env_lossy();
 
-    // Determine span events
-    let span_events = if config.include_spans {
-        FmtSpan::NEW | FmtSpan::CLOSE
-    } else {
-        FmtSpan::NONE
-    };
-
     match config.destination {
         LogDestination::Console => {
             // Console only
+            let span_events = if config.include_spans {
+                FmtSpan::NEW | FmtSpan::CLOSE
+            } else {
+                FmtSpan::NONE
+            };
+
             let console_layer = fmt::layer()
                 .with_span_events(span_events)
                 .with_ansi(config.ansi)
@@ -181,6 +180,12 @@ pub fn init_logger(config: LoggerConfig) -> Result<()> {
         }
         LogDestination::File => {
             // File only
+            let span_events = if config.include_spans {
+                FmtSpan::NEW | FmtSpan::CLOSE
+            } else {
+                FmtSpan::NONE
+            };
+
             let log_dir = config
                 .log_dir
                 .context("Log directory must be specified for file logging")?;
@@ -199,6 +204,12 @@ pub fn init_logger(config: LoggerConfig) -> Result<()> {
         }
         LogDestination::Both => {
             // Both console and file
+            let span_events = if config.include_spans {
+                FmtSpan::NEW | FmtSpan::CLOSE
+            } else {
+                FmtSpan::NONE
+            };
+
             let log_dir = config
                 .log_dir
                 .context("Log directory must be specified for file logging")?;
@@ -212,7 +223,7 @@ pub fn init_logger(config: LoggerConfig) -> Result<()> {
             let file_filter = env_filter;
 
             let console_layer = fmt::layer()
-                .with_span_events(span_events)
+                .with_span_events(span_events.clone())
                 .with_ansi(config.ansi)
                 .with_filter(console_filter);
 

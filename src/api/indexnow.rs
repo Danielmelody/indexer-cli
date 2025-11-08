@@ -40,17 +40,16 @@
 //! ```
 
 use crate::constants::{
-    INDEXNOW_API_ENDPOINT, INDEXNOW_BING_ENDPOINT, INDEXNOW_ENDPOINTS,
-    INDEXNOW_KEY_MAX_LENGTH, INDEXNOW_KEY_MIN_LENGTH, INDEXNOW_KEY_RECOMMENDED_LENGTH,
+    INDEXNOW_ENDPOINTS,
+    INDEXNOW_KEY_MAX_LENGTH, INDEXNOW_KEY_MIN_LENGTH,
     INDEXNOW_MAX_URLS_PER_REQUEST, USER_AGENT,
 };
 use crate::types::error::IndexerError;
 use crate::utils::retry::{retry_with_backoff, RetryConfig};
-use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use url::Url;
 
 // =============================================================================
@@ -93,6 +92,7 @@ pub struct IndexNowResponse {
 
 impl IndexNowResponse {
     /// Create a new IndexNowResponse
+    #[must_use]
     pub fn new(status_code: u16, message: String, endpoint: String) -> Self {
         let success = matches!(status_code, 200 | 202);
         Self {
@@ -104,11 +104,13 @@ impl IndexNowResponse {
     }
 
     /// Check if the submission was successful (200 or 202)
+    #[must_use]
     pub fn is_success(&self) -> bool {
         self.success
     }
 
     /// Check if the key is being verified (202)
+    #[must_use]
     pub fn is_pending_verification(&self) -> bool {
         self.status_code == 202
     }
@@ -285,14 +287,16 @@ impl IndexNowClient {
 
         // Execute request with retry
         let retry_config = RetryConfig {
-            max_attempts: 3,
-            initial_delay: Duration::from_secs(1),
-            max_delay: Duration::from_secs(60),
-            backoff_factor: 2.0,
+            max_retries: 3,
+            initial_backoff: Duration::from_secs(1),
+            max_backoff: Duration::from_secs(60),
+            backoff_multiplier: 2.0,
+            jitter: true,
         };
 
         let client = &self.client;
         let response = retry_with_backoff(
+            retry_config,
             || async {
                 client
                     .get(&request_url)
@@ -302,7 +306,6 @@ impl IndexNowClient {
                         message: e.to_string(),
                     })
             },
-            &retry_config,
         )
         .await?;
 
@@ -330,14 +333,22 @@ impl IndexNowClient {
                 ))
             }
             400 => {
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.map_err(|e| {
+                    IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    }
+                })?;
                 Err(IndexerError::IndexNowBadRequest {
                     message: format!("Invalid request format: {}", body),
                 })
             }
             403 => Err(IndexerError::IndexNowInvalidKey),
             422 => {
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.map_err(|e| {
+                    IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    }
+                })?;
                 Err(IndexerError::IndexNowUnprocessableEntity {
                     message: format!(
                         "URL does not belong to host or key mismatch: {}",
@@ -347,7 +358,11 @@ impl IndexNowClient {
             }
             429 => Err(IndexerError::IndexNowRateLimitExceeded),
             _ => {
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.map_err(|e| {
+                    IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    }
+                })?;
                 Err(IndexerError::IndexNowApiError {
                     status_code,
                     message: body,
@@ -422,14 +437,16 @@ impl IndexNowClient {
 
         // Execute request with retry
         let retry_config = RetryConfig {
-            max_attempts: 3,
-            initial_delay: Duration::from_secs(1),
-            max_delay: Duration::from_secs(60),
-            backoff_factor: 2.0,
+            max_retries: 3,
+            initial_backoff: Duration::from_secs(1),
+            max_backoff: Duration::from_secs(60),
+            backoff_multiplier: 2.0,
+            jitter: true,
         };
 
         let client = &self.client;
         let response = retry_with_backoff(
+            retry_config,
             || async {
                 client
                     .post(endpoint)
@@ -440,7 +457,6 @@ impl IndexNowClient {
                         message: e.to_string(),
                     })
             },
-            &retry_config,
         )
         .await?;
 
@@ -474,14 +490,22 @@ impl IndexNowClient {
                 ))
             }
             400 => {
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.map_err(|e| {
+                    IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    }
+                })?;
                 Err(IndexerError::IndexNowBadRequest {
                     message: format!("Invalid request format: {}", body),
                 })
             }
             403 => Err(IndexerError::IndexNowInvalidKey),
             422 => {
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.map_err(|e| {
+                    IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    }
+                })?;
                 Err(IndexerError::IndexNowUnprocessableEntity {
                     message: format!(
                         "URLs do not belong to host or key mismatch: {}",
@@ -491,7 +515,11 @@ impl IndexNowClient {
             }
             429 => Err(IndexerError::IndexNowRateLimitExceeded),
             _ => {
-                let body = response.text().await.unwrap_or_default();
+                let body = response.text().await.map_err(|e| {
+                    IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    }
+                })?;
                 Err(IndexerError::IndexNowApiError {
                     status_code,
                     message: body,
@@ -661,7 +689,7 @@ impl IndexNowClient {
         use rand::Rng;
 
         const CHARSET: &[u8] = b"0123456789abcdef";
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         let key: String = (0..length)
             .map(|_| {

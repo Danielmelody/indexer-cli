@@ -2,7 +2,7 @@
 
 use super::settings::Settings;
 use anyhow::{Context, Result};
-use config::{Config, ConfigError, Environment, File};
+use config::{Config, Environment, File};
 use dirs::home_dir;
 use std::path::{Path, PathBuf};
 
@@ -225,7 +225,7 @@ pub fn save_project_config(settings: &Settings) -> Result<PathBuf> {
 /// Expand tilde (~) in file paths
 pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
-    if let Ok(path_str) = path.to_str() {
+    if let Some(path_str) = path.to_str() {
         if path_str.starts_with("~/") {
             if let Some(home) = home_dir() {
                 return home.join(&path_str[2..]);

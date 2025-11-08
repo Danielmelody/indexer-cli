@@ -213,7 +213,10 @@ impl HistoryManager {
         since: Option<DateTime<Utc>>,
     ) -> Result<bool, IndexerError> {
         let conn = self.db_conn.lock().await;
-        check_url_submitted(&conn, url, api, since)
+        match since {
+            Some(timestamp) => check_url_submitted(&conn, url, api, timestamp),
+            None => Ok(false), // If no timestamp provided, assume not submitted
+        }
     }
 
     /// Record a submission to the database
@@ -367,7 +370,7 @@ impl BatchSubmitter {
             .map(|batch| {
                 let client = Arc::clone(google_client);
                 let history = Arc::clone(&self.history_manager);
-                let pb = progress.clone();
+                let pb = progress.as_ref().map(|p| p.clone());
                 let action_type = match action {
                     NotificationType::UrlUpdated => ActionType::UrlUpdated,
                     NotificationType::UrlDeleted => ActionType::UrlDeleted,
@@ -390,7 +393,7 @@ impl BatchSubmitter {
                                 } else {
                                     SubmissionStatus::Failed
                                 })
-                                .response_code(sub_result.status_code.map(|c| c as i32))
+                                .response_code(sub_result.status_code.map(|c| c as i32).unwrap_or(0))
                                 .response_message(sub_result.message.clone())
                                 .submitted_at(sub_result.submitted_at)
                                 .build(),
@@ -437,7 +440,7 @@ impl BatchSubmitter {
             }
         }
 
-        if let Some(pb) = progress {
+        if let Some(ref pb) = progress {
             pb.finish_with_message("Google submission complete");
         }
 
@@ -567,7 +570,8 @@ impl BatchSubmitter {
                         responses
                             .first()
                             .and_then(|r| r.as_ref().ok())
-                            .map(|r| r.status_code as i32),
+                            .map(|r| r.status_code as i32)
+                            .unwrap_or(0),
                     )
                     .build();
 

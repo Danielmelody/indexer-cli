@@ -524,6 +524,13 @@ impl IndexerError {
     }
 }
 
+// Implement ShouldRetry trait for retry logic
+impl crate::utils::retry::ShouldRetry for IndexerError {
+    fn should_retry(&self) -> bool {
+        self.is_retryable()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
