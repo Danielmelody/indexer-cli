@@ -1,9 +1,10 @@
 //! Google command - Google Indexing API operations.
 
 use crate::api::google_indexing::{GoogleIndexingClient, MetadataResponse};
-use crate::cli::args::{Cli, GoogleArgs, GoogleCommand, GoogleAction, GoogleSetupArgs, GoogleSubmitArgs, GoogleStatusArgs, SubmitArgs, ApiTarget, OutputFormat};
+use crate::auth::oauth::GoogleOAuthFlow;
+use crate::cli::args::{Cli, GoogleArgs, GoogleCommand, GoogleAction, GoogleAuthArgs, GoogleSetupArgs, GoogleSubmitArgs, GoogleStatusArgs, SubmitArgs, ApiTarget, OutputFormat};
 use crate::config::loader::{load_config, save_global_config, save_project_config};
-use crate::config::settings::{Settings, GoogleConfig, QuotaConfig};
+use crate::config::settings::{Settings, GoogleConfig, GoogleAuthConfig, GoogleAuthMethod, QuotaConfig};
 use crate::types::error::IndexerError;
 use crate::types::Result;
 use colored::Colorize;
@@ -12,6 +13,8 @@ use std::path::PathBuf;
 
 pub async fn run(args: GoogleArgs, cli: &Cli) -> Result<()> {
     match args.command {
+        GoogleCommand::Auth(auth_args) => auth(auth_args, cli).await,
+        GoogleCommand::Logout => logout(cli).await,
         GoogleCommand::Setup(setup_args) => setup(setup_args, cli).await,
         GoogleCommand::Submit(submit_args) => submit(submit_args, cli).await,
         GoogleCommand::Status(status_args) => status(status_args, cli).await,
@@ -20,43 +23,350 @@ pub async fn run(args: GoogleArgs, cli: &Cli) -> Result<()> {
     }
 }
 
-/// Interactive setup for Google service account
-pub async fn setup(args: GoogleSetupArgs, _cli: &Cli) -> Result<()> {
-    println!("{}", "Google Indexing API Setup".cyan().bold());
+/// Authenticate with Google using OAuth 2.0
+pub async fn auth(args: GoogleAuthArgs, _cli: &Cli) -> Result<()> {
+    println!("{}", "Google OAuth 2.0 Authentication".cyan().bold());
     println!("{}", "=".repeat(60).dimmed());
     println!();
 
-    // Get service account path
-    let default_path = args.service_account.display().to_string();
-    let sa_path_str: String = Input::new()
-        .with_prompt("Service account JSON file path")
-        .default(default_path)
+    // Determine client credentials in order of precedence:
+    // 1. Command line arguments (--client-id, --client-secret)
+    // 2. Configuration file (indexer.yaml)
+    // 3. Environment variables (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET)
+    // 4. Default placeholders (will trigger error)
+
+    let (client_id, client_secret) = if let (Some(id), Some(secret)) =
+        (args.client_id.clone(), args.client_secret.clone())
+    {
+        // Option 1: Use command line arguments
+        println!("{}", "Using OAuth credentials from command line arguments".dimmed());
+        (Some(id), Some(secret))
+    } else if let Ok(config) = load_config() {
+        // Option 2: Try to load from configuration file
+        if let Some(google_config) = &config.google {
+            if let (Some(id), Some(secret)) =
+                (&google_config.auth.oauth_client_id, &google_config.auth.oauth_client_secret)
+            {
+                println!("{}", "Using OAuth credentials from configuration file".dimmed());
+                (Some(id.clone()), Some(secret.clone()))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        }
+    } else {
+        (None, None)
+    };
+
+    // Create OAuth flow
+    let oauth_flow = if let (Some(id), Some(secret)) = (client_id, client_secret) {
+        println!("{}", "Using custom OAuth client credentials".green());
+        println!();
+        GoogleOAuthFlow::with_credentials(id, secret)?
+    } else {
+        // Option 3 & 4: Will try environment variables, then fall back to placeholders
+        println!("{}", "Checking for OAuth credentials in environment variables...".dimmed());
+        let has_env_vars = std::env::var("GOOGLE_OAUTH_CLIENT_ID").is_ok() &&
+                           std::env::var("GOOGLE_OAUTH_CLIENT_SECRET").is_ok();
+        if has_env_vars {
+            println!("{}", "Using OAuth credentials from environment variables".green());
+        } else {
+            println!("{}", "No custom credentials found, using defaults".yellow());
+            println!("{}", "WARNING: Default credentials are placeholders and will not work!".yellow().bold());
+        }
+        println!();
+        GoogleOAuthFlow::new()?
+    };
+
+    // Check if already authenticated
+    if oauth_flow.is_authenticated() && !args.force {
+        println!("{}", "Already authenticated!".green());
+        println!("Token location: {}", oauth_flow.token_store().token_file_path().display());
+        println!();
+        println!("Use --force to re-authenticate");
+        return Ok(());
+    }
+
+    if args.force && oauth_flow.is_authenticated() {
+        println!("{}", "Force re-authentication requested".yellow());
+        println!();
+    }
+
+    // Start OAuth flow
+    oauth_flow.authorize().await?;
+
+    println!();
+    println!("Next steps:");
+    println!("  • Run 'indexer-cli google verify' to verify the setup");
+    println!("  • Run 'indexer-cli google submit <url>' to submit URLs");
+    println!("  • Run 'indexer-cli google quota' to check your quota");
+
+    Ok(())
+}
+
+/// Logout and revoke Google OAuth credentials
+pub async fn logout(_cli: &Cli) -> Result<()> {
+    println!("{}", "Google OAuth Logout".cyan().bold());
+    println!("{}", "=".repeat(60).dimmed());
+    println!();
+
+    let oauth_flow = GoogleOAuthFlow::new()?;
+
+    if !oauth_flow.is_authenticated() {
+        println!("{}", "Not currently authenticated".yellow());
+        return Ok(());
+    }
+
+    // Confirm logout
+    let confirm = Confirm::new()
+        .with_prompt("Are you sure you want to logout and revoke credentials?")
+        .default(false)
         .interact()
         .map_err(|e| IndexerError::InternalError {
             message: format!("Failed to read input: {}", e),
         })?;
 
+    if !confirm {
+        println!("Logout cancelled");
+        return Ok(());
+    }
+
+    // Logout
+    oauth_flow.logout().await?;
+
+    println!();
+    println!("{}", "Successfully logged out".green());
+    println!("Run 'indexer-cli google auth' to authenticate again");
+
+    Ok(())
+}
+
+/// Interactive setup for Google service account (simplified wizard, IndexGuru-style)
+pub async fn setup(args: GoogleSetupArgs, _cli: &Cli) -> Result<()> {
+    println!("{}", "Google Indexing API Setup Wizard".cyan().bold());
+    println!("{}", "=".repeat(60));
+    println!();
+
+    println!("This wizard will help you set up Google Indexing API (Service Account method)");
+    println!("Estimated time: 5-10 minutes (one-time setup)");
+    println!();
+
+    // Step 1: Create Google Cloud Project
+    println!("{}", "─── Step 1/5: Create Google Cloud Project ───".bold());
+    println!();
+    println!("1. Visit Google Cloud Console:");
+    println!("   {}", "https://console.cloud.google.com/projectcreate".blue().underline());
+    println!();
+    println!("2. Create a new project:");
+    println!("   • Project name: any name (e.g., 'my-indexing-api')");
+    println!("   • Click 'Create'");
+    println!();
+
+    if !args.non_interactive {
+        prompt_continue("Project creation complete? Press Enter to continue")?;
+    } else {
+        println!("(Skipping confirmation in non-interactive mode)");
+        println!();
+    }
+
+    // Step 2: Enable API
+    println!("{}", "─── Step 2/5: Enable Google Indexing API ───".bold());
+    println!();
+    println!("1. Visit Indexing API page:");
+    println!("   {}", "https://console.cloud.google.com/apis/library/indexing.googleapis.com".blue().underline());
+    println!();
+    println!("2. Click the 'Enable' button");
+    println!();
+    println!("   {} Important: Wait 3-5 minutes for API to fully activate!", "⏰".yellow());
+    println!();
+
+    if !args.non_interactive {
+        prompt_continue("API enabled? Press Enter to continue")?;
+    } else {
+        println!("(Skipping confirmation in non-interactive mode)");
+        println!();
+    }
+
+    // Step 3: Create Service Account
+    println!("{}", "─── Step 3/5: Create Service Account ───".bold());
+    println!();
+    println!("1. Visit Service Accounts page:");
+    println!("   {}", "https://console.cloud.google.com/iam-admin/serviceaccounts".blue().underline());
+    println!();
+    println!("2. Make sure you selected the correct project");
+    println!();
+    println!("3. Click 'Create Service Account'");
+    println!();
+    println!("4. Fill in the details:");
+    println!("   • Service account name: indexer-cli (or any name)");
+    println!("   • Description: optional");
+    println!("   • Click 'Create and continue'");
+    println!();
+    println!("5. Skip optional steps, click 'Done'");
+    println!();
+    println!("   {} IMPORTANT: Note the email address!", "📝".yellow());
+    println!("   Format: something@project-id.iam.gserviceaccount.com");
+    println!();
+
+    if !args.non_interactive {
+        prompt_continue("Service Account created? Press Enter to continue")?;
+    } else {
+        println!("(Skipping confirmation in non-interactive mode)");
+        println!();
+    }
+
+    // Step 4: Download JSON Key
+    println!("{}", "─── Step 4/5: Download JSON Key ───".bold());
+    println!();
+    println!("1. In Service Accounts list, find your newly created account");
+    println!();
+    println!("2. Click the account name → Select the 'Keys' tab");
+    println!();
+    println!("3. Click 'Add Key' → 'Create new key'");
+    println!();
+    println!("4. Select {} as key type", "JSON".green().bold());
+    println!();
+    println!("5. Click 'Create' - JSON file will auto-download");
+    println!();
+
+    if !args.non_interactive {
+        prompt_continue("JSON key downloaded? Press Enter to continue")?;
+    } else {
+        println!("(Skipping confirmation in non-interactive mode)");
+        println!();
+    }
+
+    // Step 5: Add to Search Console (CRITICAL!)
+    println!("{}", "─── Step 5/5: Add Service Account to Google Search Console ───".bold());
+    println!();
+    println!("{}", "⚠️  CRITICAL STEP! Must be completed for API to work!".red().bold());
+    println!();
+    println!("1. Visit Google Search Console:");
+    println!("   {}", "https://search.google.com/search-console".blue().underline());
+    println!();
+    println!("2. Select your website property");
+    println!();
+    println!("3. Left menu: Settings → Users and permissions");
+    println!();
+    println!("4. Click 'Add user'");
+    println!();
+    println!("5. Paste the Service Account email");
+    println!("   (something@project-id.iam.gserviceaccount.com)");
+    println!();
+    println!("6. {} Set permission level to: {}", "⚠️ ".red(), "Owner".green().bold());
+    println!("   Other levels will cause API errors!");
+    println!();
+    println!("7. Click 'Add'");
+    println!();
+
+    if !args.non_interactive {
+        prompt_continue("Service Account added to Search Console? Press Enter to continue")?;
+    } else {
+        println!("(Skipping confirmation in non-interactive mode)");
+        println!();
+    }
+
+    // Configuration step
+    println!();
+    println!("{}", "─── Configure indexer-cli ───".bold());
+    println!();
+
+    // Get JSON file path
+    let json_path = if let Some(path_buf) = &args.service_account {
+        // Argument provided
+        path_buf.clone()
+    } else {
+        // Interactive input
+        let input: String = Input::new()
+            .with_prompt("Enter full path to your JSON key file (e.g., /Users/name/Downloads/my-project-abc123.json)")
+            .interact_text()
+            .map_err(|e| IndexerError::InternalError {
+                message: format!("Failed to read input: {}", e),
+            })?;
+        PathBuf::from(input.trim())
+    };
+
     // Validate file exists
-    let path = PathBuf::from(&sa_path_str);
-    if !path.exists() {
-        return Err(IndexerError::GoogleServiceAccountNotFound { path });
+    if !json_path.exists() {
+        println!();
+        println!("{}", "✗ File not found!".red());
+        println!("  Path: {}", json_path.display());
+        println!();
+        println!("Please check the file path and try again");
+        return Err(IndexerError::GoogleServiceAccountNotFound {
+            path: json_path,
+        });
     }
 
     println!();
-    println!("{}", "Testing authentication...".dimmed());
+    println!("{}", "Validating JSON file...".dimmed());
 
-    // Test authentication
-    let _client = GoogleIndexingClient::new(path.clone()).await?;
+    // Read and validate JSON
+    let key = yup_oauth2::read_service_account_key(&json_path)
+        .await
+        .map_err(|e| IndexerError::GoogleServiceAccountInvalid {
+            message: format!("Invalid JSON format: {}", e),
+        })?;
 
-    println!("{}", "✓ Authentication successful!".green());
+    println!("{}", "✓ JSON file is valid".green());
+    println!();
+    println!("Service Account information:");
+    println!("  • Email: {}", key.client_email.cyan());
+    if let Some(project_id) = &key.project_id {
+        println!("  • Project ID: {}", project_id.cyan());
+    }
     println!();
 
-    // Ask for global or project config
+    // Test API connection
+    println!("{}", "Testing API connection...".dimmed());
+
+    match GoogleIndexingClient::from_service_account(json_path.clone()).await {
+        Ok(_) => {
+            println!("{}", "✓ API connection successful!".green());
+        }
+        Err(e) => {
+            println!("{}", "✗ API connection failed".red());
+            println!("  Error: {}", e);
+            println!();
+            println!("Possible causes:");
+            println!("  1. Indexing API is still activating (wait 3-5 minutes)");
+            println!("  2. Service Account not added to Search Console");
+            println!("  3. Search Console permission is not 'Owner'");
+            println!();
+            println!("Suggestion: Wait a few minutes, then run 'indexer-cli google verify' to recheck");
+            println!();
+
+            // Ask to continue anyway
+            let should_continue = if args.non_interactive {
+                true // Always continue in non-interactive mode
+            } else {
+                Confirm::new()
+                    .with_prompt("Continue saving configuration anyway? (can verify later)")
+                    .default(true)
+                    .interact()
+                    .map_err(|e| IndexerError::InternalError {
+                        message: format!("Failed to read input: {}", e),
+                    })?
+            };
+
+            if !should_continue {
+                return Ok(());
+            }
+        }
+    }
+
+    // Save configuration
+    println!();
+    println!("{}", "Saving configuration...".dimmed());
+
     let use_global = if args.global {
         true
+    } else if args.non_interactive {
+        false // Default to project config in non-interactive mode
     } else {
         Confirm::new()
-            .with_prompt("Save to global configuration? (No = project config)")
+            .with_prompt("Save to global configuration? (Yes: ~/.indexer-cli/config.yaml, No: ./indexer.yaml)")
             .default(false)
             .interact()
             .map_err(|e| IndexerError::InternalError {
@@ -64,18 +374,20 @@ pub async fn setup(args: GoogleSetupArgs, _cli: &Cli) -> Result<()> {
             })?
     };
 
-    // Load existing config or create new
     let mut config = load_config().unwrap_or_default();
-
-    // Update Google config
     config.google = Some(GoogleConfig {
         enabled: true,
-        service_account_file: path,
+        auth: GoogleAuthConfig {
+            method: GoogleAuthMethod::ServiceAccount,
+            oauth_client_id: None,
+            oauth_client_secret: None,
+            service_account_file: Some(json_path),
+        },
+        service_account_file: None,
         quota: QuotaConfig::default(),
         batch_size: 100,
     });
 
-    // Save config
     let config_path = if use_global {
         save_global_config(&config)?
     } else {
@@ -83,15 +395,47 @@ pub async fn setup(args: GoogleSetupArgs, _cli: &Cli) -> Result<()> {
     };
 
     println!("{}", "✓ Configuration saved!".green());
-    println!("  Location: {}", config_path.display().to_string().dimmed());
+    println!("  Location: {}", config_path.display().to_string().cyan());
     println!();
-    println!("{}", "Setup complete! You can now use Google Indexing API.".green().bold());
+
+    // Success summary
+    println!();
+    println!("{}", "🎉 Setup complete!".green().bold());
+    println!("{}", "=".repeat(60));
+    println!();
+    println!("Google Indexing API is now configured and ready to use!");
     println!();
     println!("Next steps:");
-    println!("  • Run 'indexer google verify' to verify the setup");
-    println!("  • Run 'indexer google submit <url>' to submit URLs");
-    println!("  • Run 'indexer google quota' to check your quota");
+    println!();
+    println!("  1. {} Verify configuration", "indexer-cli google verify".cyan());
+    println!("     Check that everything is set up correctly");
+    println!();
+    println!("  2. {} Check your quota", "indexer-cli google quota".cyan());
+    println!("     See remaining daily submissions");
+    println!();
+    println!("  3. {} Start submitting URLs", "indexer-cli submit --sitemap https://your-site.com/sitemap.xml".cyan());
+    println!("     Begin submitting URLs to Google");
+    println!();
 
+    Ok(())
+}
+
+/// Helper function: Wait for user to press Enter
+fn prompt_continue(message: &str) -> Result<()> {
+    use std::io::{self, Write};
+
+    println!();
+    print!("{} ", message.dimmed());
+    io::stdout().flush().map_err(|e| IndexerError::InternalError {
+        message: format!("Output failed: {}", e),
+    })?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).map_err(|e| IndexerError::InternalError {
+        message: format!("Failed to read input: {}", e),
+    })?;
+
+    println!();
     Ok(())
 }
 
@@ -133,10 +477,8 @@ pub async fn status(args: GoogleStatusArgs, _cli: &Cli) -> Result<()> {
         field: "configuration".to_string(),
     })?;
 
-    let google_config = require_google_config(&config)?;
-
     // Create client
-    let client = GoogleIndexingClient::new(google_config.service_account_file.clone()).await?;
+    let client = create_google_client(&config).await?;
 
     // Collect URLs
     let urls = collect_urls(&args.urls, &args.file)?;
@@ -182,7 +524,7 @@ pub async fn quota(_cli: &Cli) -> Result<()> {
     let google_config = require_google_config(&config)?;
 
     // Create client
-    let client = GoogleIndexingClient::new(google_config.service_account_file.clone()).await?;
+    let client = create_google_client(&config).await?;
 
     // Get quota info
     let quota_info = client.check_quota().await?;
@@ -224,7 +566,7 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
         }
         Err(_) => {
             println!("{}", "✗ Configuration not found".red());
-            println!("  {}", "Run 'indexer google setup' to configure".dimmed());
+            println!("  {}", "Run 'indexer-cli google auth' or 'indexer-cli google setup' to configure".dimmed());
             return Err(IndexerError::ConfigMissingField {
                 field: "configuration".to_string(),
             });
@@ -239,26 +581,57 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
         }
         _ => {
             println!("{}", "✗ Google not configured or disabled".red());
-            println!("  {}", "Run 'indexer google setup' to configure".dimmed());
+            println!("  {}", "Run 'indexer-cli google auth' or 'indexer-cli google setup' to configure".dimmed());
             return Err(IndexerError::ConfigMissingField {
                 field: "google".to_string(),
             });
         }
     };
 
-    // Check service account file
-    if !google_config.service_account_file.exists() {
-        println!("{}", "✗ Service account file not found".red());
-        println!("  Expected: {}", google_config.service_account_file.display().to_string().dimmed());
-        return Err(IndexerError::GoogleServiceAccountNotFound {
-            path: google_config.service_account_file.clone(),
-        });
+    // Check authentication method
+    match google_config.auth.method {
+        GoogleAuthMethod::OAuth => {
+            println!("  Authentication Method: {}", "OAuth 2.0".cyan());
+
+            // Check if OAuth token exists
+            let oauth_flow = GoogleOAuthFlow::new()?;
+            if oauth_flow.is_authenticated() {
+                println!("{}", "✓ OAuth credentials found".green());
+            } else {
+                println!("{}", "✗ OAuth credentials not found".red());
+                println!("  {}", "Run 'indexer-cli google auth' to authenticate".dimmed());
+                return Err(IndexerError::GoogleAuthError {
+                    message: "Not authenticated".to_string(),
+                });
+            }
+        }
+        GoogleAuthMethod::ServiceAccount => {
+            println!("  Authentication Method: {}", "Service Account".cyan());
+
+            // Check service account file
+            let service_account_file = google_config
+                .auth
+                .service_account_file
+                .as_ref()
+                .or(google_config.service_account_file.as_ref())
+                .ok_or_else(|| IndexerError::ConfigMissingField {
+                    field: "google.auth.service_account_file".to_string(),
+                })?;
+
+            if !service_account_file.exists() {
+                println!("{}", "✗ Service account file not found".red());
+                println!("  Expected: {}", service_account_file.display().to_string().dimmed());
+                return Err(IndexerError::GoogleServiceAccountNotFound {
+                    path: service_account_file.clone(),
+                });
+            }
+            println!("{}", "✓ Service account file exists".green());
+        }
     }
-    println!("{}", "✓ Service account file exists".green());
 
     // Test authentication
     print!("{}", "  Testing authentication... ".dimmed());
-    let client = GoogleIndexingClient::new(google_config.service_account_file.clone()).await?;
+    let client = create_google_client(&config).await?;
     println!("{}", "✓".green());
 
     // Test API connectivity (try to get metadata for a test URL)
@@ -276,7 +649,14 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
             println!("{}", "✓".green());
             println!();
             println!("{}", "⚠ Note: Permission denied for example.com (expected)".yellow());
-            println!("  {}", "Make sure to add the service account as an owner in Search Console".dimmed());
+            match google_config.auth.method {
+                GoogleAuthMethod::OAuth => {
+                    println!("  {}", "Make sure you have access to the property in Search Console".dimmed());
+                }
+                GoogleAuthMethod::ServiceAccount => {
+                    println!("  {}", "Make sure to add the service account as an owner in Search Console".dimmed());
+                }
+            }
         }
         Err(e) => {
             println!("{}", "✗".red());
@@ -291,7 +671,7 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
     println!("  {}", "Google Indexing API is ready to use".green());
     println!();
     println!("Configuration details:");
-    println!("  Service Account: {}", google_config.service_account_file.display().to_string().dimmed());
+    println!("  Authentication: {}", format!("{:?}", google_config.auth.method).dimmed());
     println!("  Daily Limit: {}", google_config.quota.daily_limit.to_string().dimmed());
     println!("  Rate Limit: {} req/min", google_config.quota.rate_limit.to_string().dimmed());
     println!("  Batch Size: {}", google_config.batch_size.to_string().dimmed());
@@ -302,6 +682,32 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+/// Create Google Indexing client based on configuration
+async fn create_google_client(config: &Settings) -> Result<GoogleIndexingClient> {
+    let google_config = require_google_config(config)?;
+
+    // Check authentication method
+    match google_config.auth.method {
+        GoogleAuthMethod::OAuth => {
+            // Use OAuth authentication
+            GoogleIndexingClient::from_oauth().await
+        }
+        GoogleAuthMethod::ServiceAccount => {
+            // Use service account authentication
+            let service_account_file = google_config
+                .auth
+                .service_account_file
+                .as_ref()
+                .or(google_config.service_account_file.as_ref()) // Fallback to legacy field
+                .ok_or_else(|| IndexerError::ConfigMissingField {
+                    field: "google.auth.service_account_file".to_string(),
+                })?;
+
+            GoogleIndexingClient::from_service_account(service_account_file.clone()).await
+        }
+    }
+}
 
 /// Require Google config or return error
 fn require_google_config(config: &Settings) -> Result<&GoogleConfig> {

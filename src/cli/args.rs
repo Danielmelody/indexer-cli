@@ -147,7 +147,13 @@ pub struct GoogleArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum GoogleCommand {
-    /// Setup Google service account
+    /// Authenticate with Google using OAuth 2.0
+    Auth(GoogleAuthArgs),
+
+    /// Logout and revoke Google OAuth credentials
+    Logout,
+
+    /// Setup Google service account (legacy method)
     Setup(GoogleSetupArgs),
 
     /// Submit URLs to Google Indexing API
@@ -164,14 +170,33 @@ pub enum GoogleCommand {
 }
 
 #[derive(Args, Debug, Clone)]
-pub struct GoogleSetupArgs {
-    /// Path to Google service account JSON file
+pub struct GoogleAuthArgs {
+    /// Custom OAuth client ID (optional)
+    #[arg(long)]
+    pub client_id: Option<String>,
+
+    /// Custom OAuth client secret (optional)
+    #[arg(long)]
+    pub client_secret: Option<String>,
+
+    /// Force re-authentication even if already authenticated
     #[arg(short, long)]
-    pub service_account: PathBuf,
+    pub force: bool,
+}
+
+#[derive(Args, Debug, Clone)]
+pub struct GoogleSetupArgs {
+    /// Path to Google service account JSON file (optional - will prompt if not provided)
+    #[arg(short, long)]
+    pub service_account: Option<PathBuf>,
 
     /// Save to global configuration
     #[arg(short, long)]
     pub global: bool,
+
+    /// Non-interactive mode (skip confirmation prompts)
+    #[arg(long)]
+    pub non_interactive: bool,
 }
 
 #[derive(Args, Debug, Clone)]
