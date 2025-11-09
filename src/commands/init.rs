@@ -188,7 +188,13 @@ fn configure_google(theme: &ColorfulTheme) -> Result<GoogleConfig> {
 
     Ok(GoogleConfig {
         enabled: true,
-        service_account_file: PathBuf::from(service_account_path),
+        auth: crate::config::settings::GoogleAuthConfig {
+            method: crate::config::settings::GoogleAuthMethod::ServiceAccount,
+            oauth_client_id: None,
+            oauth_client_secret: None,
+            service_account_file: Some(PathBuf::from(&service_account_path)),
+        },
+        service_account_file: Some(PathBuf::from(service_account_path)),
         quota: Default::default(),
         batch_size: batch_size.parse().unwrap(),
     })

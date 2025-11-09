@@ -3,6 +3,7 @@
 //! This module provides a comprehensive client for the Google Indexing API v3,
 //! including OAuth2 authentication, URL submission, batch operations, and quota management.
 
+use crate::auth::oauth::GoogleOAuthFlow;
 use crate::types::error::IndexerError;
 use crate::utils::retry::{retry_with_condition, RetryConfig};
 use chrono::{DateTime, Utc};
@@ -182,12 +183,20 @@ impl RateLimiter {
     }
 }
 
+/// Authentication method for Google Indexing API
+enum AuthMethod {
+    /// Service account authentication (legacy)
+    ServiceAccount(Arc<Mutex<Authenticator<HttpsConnector<HttpConnector>>>>),
+    /// OAuth 2.0 user authentication
+    OAuth(GoogleOAuthFlow),
+}
+
 /// Google Indexing API client
 pub struct GoogleIndexingClient {
     /// HTTP client
     client: reqwest::Client,
-    /// OAuth2 authenticator
-    auth: Arc<Mutex<Authenticator<HttpsConnector<HttpConnector>>>>,
+    /// Authentication method
+    auth: AuthMethod,
     /// Rate limiter
     rate_limiter: Arc<Mutex<RateLimiter>>,
     /// Daily publish limit
@@ -197,7 +206,48 @@ pub struct GoogleIndexingClient {
 }
 
 impl GoogleIndexingClient {
-    /// Create a new Google Indexing API client
+    /// Create a new Google Indexing API client from OAuth flow
+    ///
+    /// # Returns
+    ///
+    /// Returns a Result containing the client or an error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The OAuth flow cannot be initialized
+    /// - The HTTP client cannot be created
+    pub async fn from_oauth() -> Result<Self, IndexerError> {
+        info!("Initializing Google Indexing API client with OAuth");
+
+        let oauth_flow = GoogleOAuthFlow::new()?;
+
+        if !oauth_flow.is_authenticated() {
+            return Err(IndexerError::GoogleAuthError {
+                message: "Not authenticated. Run 'indexer-cli google auth' first".to_string(),
+            });
+        }
+
+        // Create HTTP client
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .map_err(|e| IndexerError::HttpRequestFailed {
+                message: e.to_string(),
+            })?;
+
+        Ok(Self {
+            client,
+            auth: AuthMethod::OAuth(oauth_flow),
+            rate_limiter: Arc::new(Mutex::new(RateLimiter::new(
+                DEFAULT_RATE_LIMIT_PER_MINUTE,
+            ))),
+            daily_publish_limit: DEFAULT_DAILY_PUBLISH_LIMIT,
+            batch_size: DEFAULT_BATCH_SIZE,
+        })
+    }
+
+    /// Create a new Google Indexing API client from service account file (legacy)
     ///
     /// # Arguments
     ///
@@ -214,22 +264,7 @@ impl GoogleIndexingClient {
     /// - The service account file is invalid or malformed
     /// - The HTTP client cannot be created
     /// - Authentication with Google OAuth2 fails
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use indexer_cli::api::google_indexing::GoogleIndexingClient;
-    /// use std::path::PathBuf;
-    ///
-    /// #[tokio::main]
-    /// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let client = GoogleIndexingClient::new(
-    ///         PathBuf::from("/path/to/service-account.json")
-    ///     ).await?;
-    ///     Ok(())
-    /// }
-    /// ```
-    pub async fn new(service_account_path: PathBuf) -> Result<Self, IndexerError> {
+    pub async fn from_service_account(service_account_path: PathBuf) -> Result<Self, IndexerError> {
         // Validate service account file exists
         if !service_account_path.exists() {
             return Err(IndexerError::GoogleServiceAccountNotFound {
@@ -237,7 +272,7 @@ impl GoogleIndexingClient {
             });
         }
 
-        info!("Initializing Google Indexing API client");
+        info!("Initializing Google Indexing API client with service account");
         debug!("Service account path: {:?}", service_account_path);
 
         // Create HTTP client
@@ -249,11 +284,11 @@ impl GoogleIndexingClient {
             })?;
 
         // Create authenticator
-        let auth = Self::create_authenticator(&service_account_path).await?;
+        let auth = Self::create_service_account_authenticator(&service_account_path).await?;
 
         Ok(Self {
             client,
-            auth: Arc::new(Mutex::new(auth)),
+            auth: AuthMethod::ServiceAccount(Arc::new(Mutex::new(auth))),
             rate_limiter: Arc::new(Mutex::new(RateLimiter::new(
                 DEFAULT_RATE_LIMIT_PER_MINUTE,
             ))),
@@ -262,7 +297,7 @@ impl GoogleIndexingClient {
         })
     }
 
-    /// Create a new Google Indexing API client with custom configuration
+    /// Create a new Google Indexing API client with custom configuration (service account)
     ///
     /// # Arguments
     ///
@@ -278,13 +313,13 @@ impl GoogleIndexingClient {
     /// - The service account file is invalid or malformed
     /// - The HTTP client cannot be created
     /// - Authentication with Google OAuth2 fails
-    pub async fn with_config(
+    pub async fn from_service_account_with_config(
         service_account_path: PathBuf,
         daily_publish_limit: usize,
         rate_limit_per_minute: usize,
         batch_size: usize,
     ) -> Result<Self, IndexerError> {
-        let mut client = Self::new(service_account_path).await?;
+        let mut client = Self::from_service_account(service_account_path).await?;
         client.daily_publish_limit = daily_publish_limit;
         client.rate_limiter = Arc::new(Mutex::new(RateLimiter::new(rate_limit_per_minute)));
         client.batch_size = batch_size.min(MAX_BATCH_SIZE);
@@ -292,7 +327,7 @@ impl GoogleIndexingClient {
     }
 
     /// Create OAuth2 authenticator from service account file
-    async fn create_authenticator(
+    async fn create_service_account_authenticator(
         service_account_path: &PathBuf,
     ) -> Result<Authenticator<HttpsConnector<HttpConnector>>, IndexerError> {
         // Read service account key
@@ -327,22 +362,31 @@ impl GoogleIndexingClient {
     pub async fn authenticate(&self) -> Result<String, IndexerError> {
         debug!("Authenticating with Google OAuth2");
 
-        let auth = self.auth.lock().await;
-        let token = auth
-            .token(&[GOOGLE_INDEXING_SCOPE])
-            .await
-            .map_err(|e| IndexerError::GoogleAuthError {
-                message: e.to_string(),
-            })?;
+        match &self.auth {
+            AuthMethod::ServiceAccount(auth) => {
+                let auth = auth.lock().await;
+                let token = auth
+                    .token(&[GOOGLE_INDEXING_SCOPE])
+                    .await
+                    .map_err(|e| IndexerError::GoogleAuthError {
+                        message: e.to_string(),
+                    })?;
 
-        let access_token = token
-            .token()
-            .ok_or_else(|| IndexerError::GoogleAuthError {
-                message: "No access token returned".to_string(),
-            })?;
+                let access_token = token
+                    .token()
+                    .ok_or_else(|| IndexerError::GoogleAuthError {
+                        message: "No access token returned".to_string(),
+                    })?;
 
-        debug!("Authentication successful");
-        Ok(access_token.to_string())
+                debug!("Service account authentication successful");
+                Ok(access_token.to_string())
+            }
+            AuthMethod::OAuth(oauth_flow) => {
+                let access_token = oauth_flow.get_access_token().await?;
+                debug!("OAuth authentication successful");
+                Ok(access_token)
+            }
+        }
     }
 
     /// Submit a single URL to Google Indexing API

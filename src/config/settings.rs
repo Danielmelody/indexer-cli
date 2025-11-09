@@ -56,8 +56,13 @@ pub struct GoogleConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
 
-    /// Path to the service account JSON file
-    pub service_account_file: PathBuf,
+    /// Authentication method
+    #[serde(default)]
+    pub auth: GoogleAuthConfig,
+
+    /// Path to the service account JSON file (legacy, for backward compatibility)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_account_file: Option<PathBuf>,
 
     /// API quota settings
     #[serde(default)]
@@ -72,11 +77,63 @@ impl Default for GoogleConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            service_account_file: PathBuf::new(),
+            auth: GoogleAuthConfig::default(),
+            service_account_file: None,
             quota: QuotaConfig::default(),
             batch_size: default_google_batch_size(),
         }
     }
+}
+
+/// Google authentication configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GoogleAuthConfig {
+    /// Authentication method (oauth or service_account)
+    #[serde(default = "default_auth_method")]
+    pub method: GoogleAuthMethod,
+
+    /// OAuth client ID (optional, uses default if not specified)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth_client_id: Option<String>,
+
+    /// OAuth client secret (optional, uses default if not specified)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth_client_secret: Option<String>,
+
+    /// Service account file path (for service_account method)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub service_account_file: Option<PathBuf>,
+}
+
+impl Default for GoogleAuthConfig {
+    fn default() -> Self {
+        Self {
+            method: default_auth_method(),
+            oauth_client_id: None,
+            oauth_client_secret: None,
+            service_account_file: None,
+        }
+    }
+}
+
+/// Google authentication method
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoogleAuthMethod {
+    /// OAuth 2.0 user authentication
+    OAuth,
+    /// Service account authentication
+    ServiceAccount,
+}
+
+impl Default for GoogleAuthMethod {
+    fn default() -> Self {
+        GoogleAuthMethod::OAuth
+    }
+}
+
+fn default_auth_method() -> GoogleAuthMethod {
+    GoogleAuthMethod::OAuth
 }
 
 /// API quota configuration

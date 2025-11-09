@@ -677,7 +677,7 @@ impl IndexNowClient {
     /// # Ok::<(), indexer_cli::types::error::IndexerError>(())
     /// ```
     pub fn generate_key(length: usize) -> Result<String, IndexerError> {
-        if length < INDEXNOW_KEY_MIN_LENGTH || length > INDEXNOW_KEY_MAX_LENGTH {
+        if !(INDEXNOW_KEY_MIN_LENGTH..=INDEXNOW_KEY_MAX_LENGTH).contains(&length) {
             return Err(IndexerError::ValueOutOfRange {
                 field: "key_length".to_string(),
                 value: length.to_string(),
@@ -693,7 +693,7 @@ impl IndexNowClient {
 
         let key: String = (0..length)
             .map(|_| {
-                let idx = rng.gen_range(0..CHARSET.len());
+                let idx = rng.random_range(0..CHARSET.len());
                 CHARSET[idx] as char
             })
             .collect();

@@ -1,0 +1,95 @@
+# Indexer CLI Configuration Example
+# Copy this file to: indexer.yaml (project) or ~/.indexer-cli/config.yaml (global)
+
+# Google Indexing API Configuration
+google:
+  enabled: true
+
+  # Authentication settings
+  auth:
+    # Method: 'oauth' or 'service_account'
+    method: oauth
+
+    # OAuth 2.0 credentials (for method: oauth)
+    # IMPORTANT: Never commit these to version control!
+    # Consider using environment variables instead:
+    #   GOOGLE_OAUTH_CLIENT_ID
+    #   GOOGLE_OAUTH_CLIENT_SECRET
+    oauth_client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com"
+    oauth_client_secret: "YOUR_CLIENT_SECRET"
+
+    # Service account file (for method: service_account)
+    # service_account_file: "/path/to/service-account.json"
+
+  # API quota settings
+  quota:
+    daily_limit: 200      # Maximum daily submissions (default: 200)
+    rate_limit: 380       # Requests per minute (default: 380)
+
+  # Batch size for bulk submissions
+  batch_size: 100
+
+# IndexNow API Configuration
+indexnow:
+  enabled: true
+
+  # API key (8-128 characters)
+  # Generate with: indexer-cli indexnow generate-key
+  api_key: ""
+
+  # Key file location URL (where the key file is hosted)
+  key_location: ""
+
+  # Search engine endpoints
+  endpoints:
+    - "https://api.indexnow.org/indexnow"
+    - "https://www.bing.com/indexnow"
+    - "https://yandex.com/indexnow"
+
+  # Batch size for bulk submissions
+  batch_size: 10000
+
+# Sitemap Configuration
+sitemap:
+  # Default sitemap URL
+  url: ""
+
+  # Follow sitemap index files
+  follow_index: true
+
+  # URL filters
+  filters:
+    # URL pattern (regex)
+    url_pattern: ".*"
+
+    # Only include URLs modified after this date (ISO 8601)
+    # lastmod_after: "2024-01-01"
+
+    # Minimum priority threshold (0.0 - 1.0)
+    priority_min: 0.0
+
+# History Tracking Configuration
+history:
+  enabled: true
+  database_path: "~/.indexer-cli/history.db"
+  retention_days: 365  # Keep history for 1 year
+
+# Logging Configuration
+logging:
+  level: "info"  # debug, info, warn, error
+  file: "~/.indexer-cli/indexer.log"
+  max_size_mb: 10
+  max_backups: 5
+
+# Retry Configuration
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff_factor: 2
+  max_wait_seconds: 60
+
+# Output Configuration
+output:
+  format: "text"  # text, json, csv
+  color: true
+  verbose: false

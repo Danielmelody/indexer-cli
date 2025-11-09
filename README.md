@@ -649,11 +649,109 @@ indexer-cli validate --format json
 
 ## Google Setup Guide
 
+Google Indexing API supports two authentication methods:
+
+1. **OAuth 2.0** (Recommended for personal use) - User-friendly, browser-based authentication
+2. **Service Account** (For automation/CI/CD) - Requires more setup but better for server environments
+
+Choose the method that best fits your use case.
+
 ### Prerequisites
 
 1. A Google Cloud Platform (GCP) account
 2. A website verified in Google Search Console
 3. The website URL added as a site property
+
+---
+
+## Method 1: OAuth 2.0 Authentication (Recommended)
+
+OAuth 2.0 provides a simple, user-friendly authentication flow that doesn't require downloading JSON files or managing service accounts.
+
+### Quick Start
+
+If you want to get started immediately, see the detailed guide:
+
+**[📖 Complete OAuth Setup Guide](docs/google-oauth-setup.md)**
+
+### Overview
+
+The OAuth method allows you to authenticate using your Google account through a browser. No need to create service accounts or download JSON files!
+
+### Step 1: Create OAuth Credentials
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the **Indexing API**:
+   - Navigate to **APIs & Services** > **Library**
+   - Search for "Indexing API"
+   - Click **Enable**
+4. Create OAuth 2.0 credentials:
+   - Go to **APIs & Services** > **Credentials**
+   - Click **Create Credentials** > **OAuth client ID**
+   - Choose **Desktop app** or **Web application**
+   - Add redirect URI: `http://localhost:8080/oauth/callback`
+   - Copy the Client ID and Client Secret
+
+### Step 2: Configure Credentials
+
+Choose one of these methods:
+
+**Option A - Environment Variables (Recommended):**
+```bash
+export GOOGLE_OAUTH_CLIENT_ID="YOUR_CLIENT_ID.apps.googleusercontent.com"
+export GOOGLE_OAUTH_CLIENT_SECRET="YOUR_CLIENT_SECRET"
+```
+
+**Option B - Configuration File:**
+```yaml
+# indexer.yaml
+google:
+  auth:
+    method: oauth
+    oauth_client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com"
+    oauth_client_secret: "YOUR_CLIENT_SECRET"
+```
+
+**Option C - Command Line:**
+```bash
+indexer-cli google auth \
+  --client-id "YOUR_CLIENT_ID.apps.googleusercontent.com" \
+  --client-secret "YOUR_CLIENT_SECRET"
+```
+
+### Step 3: Authenticate
+
+```bash
+indexer-cli google auth
+```
+
+This will:
+1. Open your browser to Google's authorization page
+2. Ask you to sign in and grant permissions
+3. Save the access token locally
+4. Automatically refresh the token when needed
+
+### Step 4: Verify
+
+```bash
+indexer-cli google verify
+```
+
+### Troubleshooting
+
+If you see the error:
+```
+Error: OAuth client credentials not configured
+```
+
+This means you need to create your own OAuth credentials. The default credentials are placeholders. Follow the steps above or see the [detailed OAuth guide](docs/google-oauth-setup.md).
+
+---
+
+## Method 2: Service Account Authentication (Advanced)
+
+Service accounts are better for automation, server environments, and CI/CD pipelines. This method doesn't require browser interaction.
 
 ### Step 1: Create a GCP Project
 
@@ -700,6 +798,20 @@ indexer-cli validate --format json
 indexer-cli google setup --service-account ~/.indexer-cli/service-account.json
 indexer-cli google verify
 ```
+
+---
+
+## Authentication Comparison
+
+| Feature | OAuth 2.0 | Service Account |
+|---------|-----------|-----------------|
+| Setup complexity | Simple | Moderate |
+| Browser required | Yes (first time only) | No |
+| Best for | Personal use, development | Automation, CI/CD, servers |
+| Credentials management | Browser tokens | JSON key file |
+| User interaction | Initial auth only | None |
+| Token refresh | Automatic | Automatic |
+| Search Console access | Your Google account | Service account email |
 
 ### Quota Limits
 

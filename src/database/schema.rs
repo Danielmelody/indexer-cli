@@ -92,7 +92,8 @@ pub fn init_database(db_path: &Path) -> Result<Connection, IndexerError> {
         })?;
 
     // Enable WAL mode for better concurrency
-    conn.execute("PRAGMA journal_mode = WAL", [])
+    // Note: PRAGMA journal_mode returns a result, so we need to use query_row instead of execute
+    let _: String = conn.query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))
         .map_err(|e| IndexerError::DatabaseQueryFailed {
             message: format!("Failed to enable WAL mode: {}", e),
         })?;

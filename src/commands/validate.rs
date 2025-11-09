@@ -86,13 +86,15 @@ async fn check_connectivity(config: &crate::config::Settings) -> Result<Vec<Stri
     // Test Google API if configured
     if let Some(google_config) = &config.google {
         if google_config.enabled {
-            match GoogleIndexingClient::new(google_config.service_account_file.clone()).await {
-                Ok(_client) => {
-                    // Successfully created client (which validates and authenticates)
-                    results.push("✓ Google API authentication successful".to_string());
-                }
-                Err(e) => {
-                    results.push(format!("✗ Google API connection failed: {}", e));
+            if let Some(service_account_path) = &google_config.service_account_file {
+                match GoogleIndexingClient::from_service_account(service_account_path.clone()).await {
+                    Ok(_client) => {
+                        // Successfully created client (which validates and authenticates)
+                        results.push("✓ Google API authentication successful".to_string());
+                    }
+                    Err(e) => {
+                        results.push(format!("✗ Google API connection failed: {}", e));
+                    }
                 }
             }
         }
@@ -129,14 +131,15 @@ fn check_referenced_files(config: &crate::config::Settings) -> Result<Vec<String
     // Check Google service account file
     if let Some(google_config) = &config.google {
         if google_config.enabled {
-            let path = &google_config.service_account_file;
-            if path.exists() {
-                results.push(format!("✓ Google service account file exists: {}", path.display()));
-            } else {
-                results.push(format!(
-                    "✗ Google service account file not found: {}",
-                    path.display()
-                ));
+            if let Some(path) = &google_config.service_account_file {
+                if path.exists() {
+                    results.push(format!("✓ Google service account file exists: {}", path.display()));
+                } else {
+                    results.push(format!(
+                        "✗ Google service account file not found: {}",
+                        path.display()
+                    ));
+                }
             }
         }
     }
@@ -185,33 +188,34 @@ fn check_file_permissions(config: &crate::config::Settings) -> Result<Vec<String
     // Check Google service account file
     if let Some(google_config) = &config.google {
         if google_config.enabled {
-            let path = &google_config.service_account_file;
-            if path.exists() {
-                let metadata = std::fs::metadata(path)?;
-                let permissions = metadata.permissions();
+            if let Some(path) = &google_config.service_account_file {
+                if path.exists() {
+                    let metadata = std::fs::metadata(path)?;
+                    let permissions = metadata.permissions();
 
-                #[cfg(unix)]
-                {
-                    use std::os::unix::fs::PermissionsExt;
-                    let mode = permissions.mode();
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let mode = permissions.mode();
 
-                    // Warn if file is world-readable (security issue)
-                    if mode & 0o004 != 0 {
-                        results.push(format!(
-                            "⚠ {} is world-readable (security risk)",
-                            path.display()
-                        ));
-                    } else {
-                        results.push(format!("✓ {} has secure permissions", path.display()));
+                        // Warn if file is world-readable (security issue)
+                        if mode & 0o004 != 0 {
+                            results.push(format!(
+                                "⚠ {} is world-readable (security risk)",
+                                path.display()
+                            ));
+                        } else {
+                            results.push(format!("✓ {} has secure permissions", path.display()));
+                        }
                     }
-                }
 
-                #[cfg(not(unix))]
-                {
-                    if permissions.readonly() {
-                        results.push(format!("⚠ {} is read-only", path.display()));
-                    } else {
-                        results.push(format!("✓ {} is accessible", path.display()));
+                    #[cfg(not(unix))]
+                    {
+                        if permissions.readonly() {
+                            results.push(format!("⚠ {} is read-only", path.display()));
+                        } else {
+                            results.push(format!("✓ {} is accessible", path.display()));
+                        }
                     }
                 }
             }

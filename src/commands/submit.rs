@@ -131,9 +131,12 @@ pub async fn run(args: SubmitArgs, cli: &Cli) -> Result<()> {
                 field: "google".to_string(),
             })?;
 
-        let service_account_path = google_config.service_account_file.clone();
+        let service_account_path = google_config.service_account_file.clone()
+            .ok_or_else(|| crate::types::error::IndexerError::ConfigMissingField {
+                field: "google.service_account_file".to_string(),
+            })?;
 
-        match GoogleIndexingClient::new(service_account_path).await {
+        match GoogleIndexingClient::from_service_account(service_account_path).await {
             Ok(client) => {
                 if !cli.quiet {
                     println!("  {} Google API client ready", "✓".green());
@@ -150,11 +153,37 @@ pub async fn run(args: SubmitArgs, cli: &Cli) -> Result<()> {
             }
         }
     } else {
-        if !cli.quiet && matches!(args.api, ApiTarget::Google) {
-            println!(
-                "  {} Google API not configured, skipping",
-                "!".yellow()
-            );
+        // When user expects to use Google but it's not configured, give clear guidance
+        if !cli.quiet {
+            match args.api {
+                ApiTarget::Google => {
+                    // Explicitly requested Google - show error-level guidance
+                    eprintln!(
+                        "\n  {} Google Indexing API is not configured",
+                        "!".yellow().bold()
+                    );
+                    eprintln!(
+                        "  {} Run 'indexer-cli google auth' to set up OAuth authentication",
+                        "→".cyan()
+                    );
+                    eprintln!(
+                        "  {} Or use '--api index-now' to only use IndexNow API\n",
+                        "→".cyan()
+                    );
+                }
+                ApiTarget::All => {
+                    // Using All but Google is not configured - show info-level notice
+                    println!(
+                        "  {} Google Indexing API not configured (will only use IndexNow)",
+                        "ℹ".blue()
+                    );
+                    println!(
+                        "    Run 'indexer-cli google auth' to enable Google Search indexing",
+                    );
+                    println!();
+                }
+                _ => {}
+            }
         }
         None
     };
@@ -199,11 +228,36 @@ pub async fn run(args: SubmitArgs, cli: &Cli) -> Result<()> {
             }
         }
     } else {
-        if !cli.quiet && matches!(args.api, ApiTarget::IndexNow) {
-            println!(
-                "  {} IndexNow API not configured, skipping",
-                "!".yellow()
-            );
+        if !cli.quiet {
+            match args.api {
+                ApiTarget::IndexNow => {
+                    // Explicitly requested IndexNow - show error-level guidance
+                    eprintln!(
+                        "\n  {} IndexNow API is not configured",
+                        "!".yellow().bold()
+                    );
+                    eprintln!(
+                        "  {} Run 'indexer-cli indexnow setup' to configure IndexNow",
+                        "→".cyan()
+                    );
+                    eprintln!(
+                        "  {} Or use '--api google' to only use Google Indexing API\n",
+                        "→".cyan()
+                    );
+                }
+                ApiTarget::All => {
+                    // Using All but IndexNow is not configured - show info-level notice
+                    println!(
+                        "  {} IndexNow API not configured (will only use Google)",
+                        "ℹ".blue()
+                    );
+                    println!(
+                        "    Run 'indexer-cli indexnow setup' to enable IndexNow",
+                    );
+                    println!();
+                }
+                _ => {}
+            }
         }
         None
     };
@@ -389,7 +443,8 @@ fn should_use_google(args: &SubmitArgs, config: &crate::config::Settings) -> boo
     let configured = config
         .google
         .as_ref()
-        .map(|g| !g.service_account_file.as_os_str().is_empty())
+        .and_then(|g| g.service_account_file.as_ref())
+        .map(|p| !p.as_os_str().is_empty())
         .unwrap_or(false);
 
     requested && enabled && configured

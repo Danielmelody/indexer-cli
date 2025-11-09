@@ -60,17 +60,19 @@ pub fn validate_config(settings: &Settings) -> Result<ValidationReport> {
 /// Validate Google Indexing API configuration
 pub fn validate_google_config(config: &GoogleConfig) -> Result<()> {
     // Check if service account file exists
-    let service_account_path = expand_tilde(&config.service_account_file);
+    if let Some(service_account_file) = &config.service_account_file {
+        let service_account_path = expand_tilde(service_account_file);
 
-    if !service_account_path.exists() {
-        anyhow::bail!(
-            "Service account file not found: {}",
-            service_account_path.display()
-        );
+        if !service_account_path.exists() {
+            anyhow::bail!(
+                "Service account file not found: {}",
+                service_account_path.display()
+            );
+        }
+
+        // Validate service account file is valid JSON
+        validate_service_account_file(&service_account_path)?;
     }
-
-    // Validate service account file is valid JSON
-    validate_service_account_file(&service_account_path)?;
 
     // Validate quota limits
     if config.quota.daily_limit == 0 {

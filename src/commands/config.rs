@@ -124,9 +124,9 @@ async fn validate_config_command(cli: &Cli) -> Result<()> {
         Err(e) => {
             // The error already contains the validation report
             eprintln!("{}", e.to_string().red());
-            return Err(IndexerError::ConfigValidationError {
+            Err(IndexerError::ConfigValidationError {
                 message: "Configuration validation failed".to_string(),
-            });
+            })
         }
     }
 }
@@ -283,7 +283,7 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             if settings.google.is_none() {
                 settings.google = Some(Default::default());
             }
-            settings.google.as_mut().unwrap().service_account_file = PathBuf::from(value);
+            settings.google.as_mut().unwrap().service_account_file = Some(PathBuf::from(value));
         }
         ["google", "batch_size"] => {
             let batch_size = value.parse::<usize>()
@@ -434,7 +434,8 @@ fn get_value_by_key(settings: &Settings, key: &str) -> Result<String> {
         }
         ["google", "service_account_file"] => {
             settings.google.as_ref()
-                .map(|g| g.service_account_file.display().to_string())
+                .and_then(|g| g.service_account_file.as_ref())
+                .map(|p| p.display().to_string())
                 .unwrap_or_else(|| "null".to_string())
         }
         ["google", "batch_size"] => {

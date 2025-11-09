@@ -57,14 +57,6 @@ struct SitemapState {
 }
 
 impl SitemapState {
-    /// Create an empty sitemap state
-    fn new() -> Self {
-        Self {
-            urls: HashMap::new(),
-            last_check: Utc::now(),
-        }
-    }
-
     /// Create sitemap state from a list of URLs
     fn from_urls(urls: Vec<SitemapUrl>) -> Self {
         let url_map = urls
@@ -166,7 +158,11 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
                 if !cli.quiet {
                     println!("{}", "Initializing Google Indexing API...".cyan());
                 }
-                match GoogleIndexingClient::new(google_config.service_account_file.clone()).await {
+                let service_account_path = google_config.service_account_file.clone()
+                    .ok_or_else(|| crate::types::error::IndexerError::ConfigMissingField {
+                        field: "google.service_account_file".to_string(),
+                    })?;
+                match GoogleIndexingClient::from_service_account(service_account_path).await {
                     Ok(client) => {
                         if !cli.quiet {
                             println!("  {} Google API client ready", "✓".green());
@@ -421,7 +417,8 @@ fn should_use_google(api_target: &ApiTarget, config: &crate::config::Settings) -
     let configured = config
         .google
         .as_ref()
-        .map(|g| !g.service_account_file.as_os_str().is_empty())
+        .and_then(|g| g.service_account_file.as_ref())
+        .map(|p| !p.as_os_str().is_empty())
         .unwrap_or(false);
 
     requested && enabled && configured

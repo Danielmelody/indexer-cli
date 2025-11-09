@@ -26,18 +26,18 @@ clap_complete = "4.5"
 reqwest = { version = "0.12", features = ["json", "gzip", "rustls-tls"] }
 
 # Async runtime
-tokio = { version = "1.47", features = ["full"] }
+tokio = { version = "1.48", features = ["full"] }
 async-trait = "0.1"
 futures = "0.3"
 async-recursion = "1.1"
-hyper = "1.5"
+hyper = "1.7"
 hyper-util = "0.1"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
-csv = "1.3"
+csv = "1.4"
 
 # XML parsing
 quick-xml = "0.37"
@@ -49,6 +49,8 @@ rusqlite = { version = "0.37", features = ["bundled", "chrono"] }
 # Google API auth
 yup-oauth2 = "12.1"
 google-indexing3 = "6.0"
+oauth2 = { version = "5.0", features = ["reqwest", "reqwest-blocking"] }
+webbrowser = "1.0"
 
 # Date/time
 chrono = { version = "0.4", features = ["serde"] }
@@ -70,14 +72,14 @@ sha2 = "0.10"
 base64 = "0.22"
 percent-encoding = "2.3"
 dirs = "6.0"
-flate2 = "1.0"
+flate2 = "1.1"
 
 # Progress bars
 indicatif = "0.18"
 
 # Colored output
 console = "0.16"
-colored = "2.1"
+colored = "2.2"
 
 # Interactive prompts
 dialoguer = "0.11"
@@ -87,7 +89,7 @@ config = "0.15"
 dotenvy = "0.15"
 
 # File operations
-tempfile = "3.20"
+tempfile = "3.23"
 walkdir = "2.5"
 mime = "0.3"
 
@@ -106,13 +108,13 @@ validator = "0.20"
 validator_derive = "0.20"
 
 # Signal handling
-ctrlc = "3.4"
+ctrlc = "3.5"
 
 [dev-dependencies]
 criterion = "0.7"
 mockall = "0.13"
 serial_test = "3.2"
-tempfile = "3.20"
+tempfile = "3.23"
 wiremock = "0.6"
 
 [profile.release]
