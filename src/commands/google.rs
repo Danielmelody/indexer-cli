@@ -144,6 +144,160 @@ pub async fn logout(_cli: &Cli) -> Result<()> {
 
 /// Interactive setup for Google service account (simplified wizard, IndexGuru-style)
 pub async fn setup(args: GoogleSetupArgs, _cli: &Cli) -> Result<()> {
+    // Check if user provided a JSON file - if so, skip the wizard and go directly to validation
+    let has_json_file = if let Some(ref path) = args.service_account {
+        path.exists()
+    } else {
+        false
+    };
+
+    if has_json_file {
+        // User already has the JSON file, skip wizard and directly configure
+        println!("{}", "Google Indexing API Setup".cyan().bold());
+        println!("{}", "=".repeat(60));
+        println!();
+
+        let json_path = args.service_account.unwrap(); // Safe because has_json_file is true
+
+        println!("📄 Service Account JSON file: {}", json_path.display().to_string().cyan());
+        println!();
+
+        // Validate JSON file
+        println!("{}", "Validating JSON file...".dimmed());
+
+        let key = yup_oauth2::read_service_account_key(&json_path)
+            .await
+            .map_err(|e| IndexerError::GoogleServiceAccountInvalid {
+                message: format!("Failed to read service account key: {}", e),
+            })?;
+
+        println!("{}", "✓ JSON file format is valid".green());
+        println!();
+        println!("  Service Account Information:");
+        println!("  • Email: {}", key.client_email.cyan());
+        if let Some(project_id) = &key.project_id {
+            println!("  • Project ID: {}", project_id.cyan());
+        }
+        println!();
+
+        // Check for RSA PRIVATE KEY format issue
+        if let Ok(content) = std::fs::read_to_string(&json_path) {
+            if content.contains("BEGIN RSA PRIVATE KEY") {
+                println!("{}", "✗ Invalid private key format detected!".red().bold());
+                println!();
+                println!("The JSON contains {} instead of {}",
+                    "RSA PRIVATE KEY (PKCS#1)".red(),
+                    "PRIVATE KEY (PKCS#8)".green());
+                println!();
+                println!("Please create a new key from Google Cloud Console");
+                println!("and ensure you select {} format.", "JSON".green().bold());
+                println!();
+                return Err(IndexerError::GoogleServiceAccountInvalid {
+                    message: "Private key format is PKCS#1 (RSA PRIVATE KEY). Google requires PKCS#8 (PRIVATE KEY).".to_string(),
+                });
+            }
+        }
+
+        // Test authentication
+        println!("{}", "Testing API authentication...".dimmed());
+
+        match GoogleIndexingClient::from_service_account(json_path.clone()).await {
+            Ok(_) => {
+                println!("{}", "✓ API authentication successful!".green());
+            }
+            Err(e) => {
+                println!("{}", "✗ API authentication failed".red());
+                println!("  Error: {}", e);
+                println!();
+                println!("{}", "Common causes:".yellow());
+                println!("  1. Indexing API not enabled or still activating (wait 3-5 min)");
+                println!("  2. Service Account not added to Google Search Console");
+                println!("  3. Search Console permission is not 'Owner'");
+                println!();
+                println!("{}", "To add Service Account to Search Console:".green().bold());
+                println!("  1. Visit: {}", "https://search.google.com/search-console".blue());
+                println!("  2. Select your website property");
+                println!("  3. Settings → Users and permissions → Add user");
+                println!("  4. Email: {}", key.client_email.cyan());
+                println!("  5. Permission: {}", "Owner".green().bold());
+                println!();
+
+                // Ask if user wants to save config anyway
+                if !args.non_interactive {
+                    println!("Configuration can be saved now and tested later.");
+                    let should_save = dialoguer::Confirm::new()
+                        .with_prompt("Save configuration anyway?")
+                        .default(true)
+                        .interact()
+                        .map_err(|e| IndexerError::InternalError {
+                            message: format!("Failed to read input: {}", e),
+                        })?;
+
+                    if !should_save {
+                        return Ok(());
+                    }
+                    println!();
+                } else {
+                    println!("Saving configuration (non-interactive mode)...");
+                    println!();
+                }
+            }
+        }
+
+        // Save configuration
+        println!("{}", "Saving configuration...".dimmed());
+
+        let use_global = if args.global {
+            true
+        } else if args.non_interactive {
+            false
+        } else {
+            dialoguer::Confirm::new()
+                .with_prompt("Save to global configuration? (No = project config)")
+                .default(false)
+                .interact()
+                .map_err(|e| IndexerError::InternalError {
+                    message: format!("Failed to read input: {}", e),
+                })?
+        };
+
+        let mut config = load_config().unwrap_or_default();
+        config.google = Some(GoogleConfig {
+            enabled: true,
+            auth: GoogleAuthConfig {
+                method: GoogleAuthMethod::ServiceAccount,
+                oauth_client_id: None,
+                oauth_client_secret: None,
+                service_account_file: Some(json_path),
+            },
+            service_account_file: None,
+            quota: QuotaConfig::default(),
+            batch_size: 100,
+        });
+
+        let config_path = if use_global {
+            save_global_config(&config)?
+        } else {
+            save_project_config(&config)?
+        };
+
+        println!("{}", "✓ Configuration saved!".green());
+        println!("  Location: {}", config_path.display().to_string().cyan());
+        println!();
+
+        // Success message
+        println!("{}", "🎉 Setup complete!".green().bold());
+        println!();
+        println!("Next steps:");
+        println!("  1. {} - Verify configuration", "indexer-cli google verify".cyan());
+        println!("  2. {} - Check quota", "indexer-cli google quota".cyan());
+        println!("  3. {} - Submit URLs", "indexer-cli submit --sitemap <url>".cyan());
+        println!();
+
+        return Ok(());
+    }
+
+    // No JSON file provided, show the full wizard
     println!("{}", "Google Indexing API Setup Wizard".cyan().bold());
     println!("{}", "=".repeat(60));
     println!();
