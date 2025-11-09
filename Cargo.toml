@@ -77,7 +77,7 @@ indicatif = "0.18"
 
 # Colored output
 console = "0.16"
-colored = "2.1"
+colored = "3.0"
 
 # Interactive prompts
 dialoguer = "0.11"
