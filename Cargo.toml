@@ -80,7 +80,7 @@ console = "0.16"
 colored = "3.0"
 
 # Interactive prompts
-dialoguer = "0.11"
+dialoguer = "0.12"
 
 # Configuration
 config = "0.15"
