@@ -1,0 +1,37 @@
+google:
+  enabled: true
+  auth:
+    method: service_account
+    service_account_file: /tmp/test-service-account.json
+  quota:
+    daily_limit: 200
+    rate_limit: 380
+  batch_size: 100
+indexnow:
+  enabled: true
+  api_key: e357c7d007c0e50c7127b590ffc27926
+  key_location: https://test-ipv6.run/e357c7d007c0e50c7127b590ffc27926.txt
+  endpoints:
+  - https://api.indexnow.org/indexnow
+  - https://www.bing.com/indexnow
+  - https://yandex.com/indexnow
+  batch_size: 10000
+sitemap: null
+history:
+  enabled: true
+  database_path: ~/.indexer-cli/history.db
+  retention_days: 365
+logging:
+  level: info
+  file: ~/.indexer-cli/indexer.log
+  max_size_mb: 10
+  max_backups: 5
+retry:
+  enabled: true
+  max_attempts: 3
+  backoff_factor: 2
+  max_wait_seconds: 60
+output:
+  format: text
+  color: true
+  verbose: false

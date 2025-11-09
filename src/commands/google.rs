@@ -663,6 +663,43 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
                 Ok(key) => {
                     println!("{}", "✓".green());
                     println!("    Service Account: {}", key.client_email.cyan());
+
+                    // Check for RSA PRIVATE KEY format issue
+                    if let Ok(content) = std::fs::read_to_string(&service_account_file) {
+                        if content.contains("BEGIN RSA PRIVATE KEY") {
+                            println!();
+                            println!("{}", "✗ Invalid private key format detected!".red().bold());
+                            println!();
+                            println!("The JSON contains {} instead of {}",
+                                "RSA PRIVATE KEY (PKCS#1)".red(),
+                                "PRIVATE KEY (PKCS#8)".green());
+                            println!();
+                            println!("{}", "Why this happens:".yellow());
+                            println!("  • Old key creation method was used");
+                            println!("  • Key was manually edited or converted");
+                            println!("  • Downloaded from wrong source");
+                            println!();
+                            println!("{}", "How to fix:".green().bold());
+                            println!("  1. Go to Google Cloud Console:");
+                            println!("     {}", "https://console.cloud.google.com/iam-admin/serviceaccounts".blue());
+                            println!();
+                            println!("  2. Delete the current key:");
+                            println!("     • Click on service account: {}", key.client_email.cyan());
+                            println!("     • Keys tab → Find key → Delete");
+                            println!();
+                            println!("  3. Create a NEW key:");
+                            println!("     • Add Key → Create new key");
+                            println!("     • Select {} format", "JSON".green().bold());
+                            println!("     • Download the file");
+                            println!();
+                            println!("  4. Re-run setup:");
+                            println!("     {}", "indexer-cli google setup --service-account <new-file.json>".cyan());
+                            println!();
+                            return Err(IndexerError::GoogleServiceAccountInvalid {
+                                message: format!("Private key is in PKCS#1 format (RSA PRIVATE KEY). Google requires PKCS#8 format (PRIVATE KEY). File: {}", service_account_file.display()),
+                            });
+                        }
+                    }
                 }
                 Err(e) => {
                     println!("{}", "✗".red());
