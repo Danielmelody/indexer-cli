@@ -40,8 +40,8 @@ serde_yaml = "0.9"
 csv = "1.4"
 
 # XML parsing
-quick-xml = "0.37"
-roxmltree = "0.20"
+quick-xml = "0.38"
+roxmltree = "0.21"
 
 # Database
 rusqlite = { version = "0.37", features = ["bundled", "chrono"] }
@@ -79,10 +79,10 @@ indicatif = "0.18"
 
 # Colored output
 console = "0.16"
-colored = "2.2"
+colored = "3.0"
 
 # Interactive prompts
-dialoguer = "0.11"
+dialoguer = "0.12"
 
 # Configuration
 config = "0.15"
@@ -99,7 +99,7 @@ selectors = "0.32"
 
 # HTML parsing
 html5ever = "0.35"
-markup5ever = "0.14"
+markup5ever = "0.35"
 
 tendril = "0.4"
 
