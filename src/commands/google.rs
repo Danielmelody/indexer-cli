@@ -305,8 +305,38 @@ pub async fn setup(args: GoogleSetupArgs, _cli: &Cli) -> Result<()> {
     // Read and validate JSON
     let key = yup_oauth2::read_service_account_key(&json_path)
         .await
-        .map_err(|e| IndexerError::GoogleServiceAccountInvalid {
-            message: format!("Invalid JSON format: {}", e),
+        .map_err(|e| {
+            let error_msg = e.to_string();
+            println!();
+            println!("{}", "✗ Failed to read JSON file".red());
+            println!("  Error: {}", error_msg.red());
+            println!();
+
+            if error_msg.contains("Not enough private keys in PEM")
+                || error_msg.contains("private_key")
+                || error_msg.contains("key") {
+                println!("{}", "This error usually means:".yellow());
+                println!("  1. The JSON file is corrupted or incomplete");
+                println!("  2. The 'private_key' field is missing or malformed");
+                println!("  3. You downloaded P12 format instead of JSON");
+                println!();
+                println!("{}", "Solution:".green());
+                println!("  1. Visit: https://console.cloud.google.com/iam-admin/serviceaccounts");
+                println!("  2. Select your service account");
+                println!("  3. Keys → Add Key → Create new key");
+                println!("  4. {} Choose JSON format (NOT P12!)", "IMPORTANT:".red().bold());
+                println!("  5. Click Create");
+                println!();
+            } else {
+                println!("{}", "Troubleshooting:".yellow());
+                println!("  • Ensure the file is valid JSON");
+                println!("  • Check that the file is not corrupted");
+                println!("  • Verify you have the correct file");
+            }
+
+            IndexerError::GoogleServiceAccountInvalid {
+                message: error_msg,
+            }
         })?;
 
     println!("{}", "✓ JSON file is valid".green());
@@ -626,6 +656,39 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
                 });
             }
             println!("{}", "✓ Service account file exists".green());
+
+            // Validate JSON file format before authentication test
+            print!("{}", "  Validating JSON format... ".dimmed());
+            match yup_oauth2::read_service_account_key(&service_account_file).await {
+                Ok(key) => {
+                    println!("{}", "✓".green());
+                    println!("    Service Account: {}", key.client_email.cyan());
+                }
+                Err(e) => {
+                    println!("{}", "✗".red());
+                    println!();
+                    println!("{}", format!("JSON validation error: {}", e).red());
+                    println!();
+
+                    if e.to_string().contains("Not enough private keys in PEM")
+                        || e.to_string().contains("private_key")
+                        || e.to_string().contains("key") {
+                        println!("{}", "Common causes:".yellow());
+                        println!("  • Private key field is missing or corrupted");
+                        println!("  • Downloaded P12 format instead of JSON");
+                        println!("  • JSON file is truncated or damaged");
+                        println!();
+                        println!("{}", "Fix:".green());
+                        println!("  1. Delete the current key from Google Cloud Console");
+                        println!("  2. Create a new key and download as JSON format");
+                        println!("  3. Run: indexer-cli google setup --service-account <path>");
+                    }
+
+                    return Err(IndexerError::GoogleServiceAccountInvalid {
+                        message: e.to_string(),
+                    });
+                }
+            }
         }
     }
 

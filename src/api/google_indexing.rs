@@ -330,21 +330,63 @@ impl GoogleIndexingClient {
     async fn create_service_account_authenticator(
         service_account_path: &PathBuf,
     ) -> Result<Authenticator<HttpsConnector<HttpConnector>>, IndexerError> {
+        debug!("Reading service account key from: {:?}", service_account_path);
+
         // Read service account key
         let service_account_key = yup_oauth2::read_service_account_key(&service_account_path)
             .await
-            .map_err(|e| IndexerError::GoogleServiceAccountInvalid {
-                message: e.to_string(),
+            .map_err(|e| {
+                let error_msg = e.to_string();
+                error!("Failed to read service account key: {}", error_msg);
+
+                // Check if it's a PEM parsing error
+                if error_msg.contains("Not enough private keys in PEM")
+                    || error_msg.contains("private_key")
+                    || error_msg.contains("key") {
+                    IndexerError::GoogleServiceAccountInvalid {
+                        message: format!(
+                            "Invalid service account JSON: {}. \
+                            Ensure the file contains a valid 'private_key' field. \
+                            Download the key as JSON (not P12) from Google Cloud Console.",
+                            error_msg
+                        ),
+                    }
+                } else {
+                    IndexerError::GoogleServiceAccountInvalid {
+                        message: error_msg,
+                    }
+                }
             })?;
+
+        // Validate that the key has required fields
+        if service_account_key.client_email.is_empty() {
+            error!("Service account key is missing client_email");
+            return Err(IndexerError::GoogleServiceAccountInvalid {
+                message: "Service account JSON is missing 'client_email' field".to_string(),
+            });
+        }
+
+        debug!("Service account email: {}", service_account_key.client_email);
+        debug!("Project ID: {:?}", service_account_key.project_id);
 
         // Create authenticator
         let auth = ServiceAccountAuthenticator::builder(service_account_key)
             .build()
             .await
-            .map_err(|e| IndexerError::GoogleAuthError {
-                message: e.to_string(),
+            .map_err(|e| {
+                let error_msg = e.to_string();
+                error!("Failed to create authenticator: {}", error_msg);
+
+                IndexerError::GoogleAuthError {
+                    message: format!(
+                        "Failed to create authenticator from service account: {}. \
+                        This usually means the private key is invalid or missing.",
+                        error_msg
+                    ),
+                }
             })?;
 
+        info!("Successfully created service account authenticator");
         Ok(auth)
     }
 
