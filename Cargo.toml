@@ -97,7 +97,7 @@ selectors = "0.32"
 
 # HTML parsing
 html5ever = "0.35"
-markup5ever = "0.14"
+markup5ever = "0.35"
 
 tendril = "0.4"
 
