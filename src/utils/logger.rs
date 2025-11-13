@@ -189,7 +189,9 @@ pub fn init_logger(config: LoggerConfig) -> Result<()> {
             let log_dir = config
                 .log_dir
                 .context("Log directory must be specified for file logging")?;
-            let file_prefix = config.file_prefix.unwrap_or_else(|| "indexer-cli".to_string());
+            let file_prefix = config
+                .file_prefix
+                .unwrap_or_else(|| "indexer-cli".to_string());
 
             let file_appender =
                 RollingFileAppender::new(config.rotation.into(), log_dir, file_prefix);
@@ -213,7 +215,9 @@ pub fn init_logger(config: LoggerConfig) -> Result<()> {
             let log_dir = config
                 .log_dir
                 .context("Log directory must be specified for file logging")?;
-            let file_prefix = config.file_prefix.unwrap_or_else(|| "indexer-cli".to_string());
+            let file_prefix = config
+                .file_prefix
+                .unwrap_or_else(|| "indexer-cli".to_string());
 
             let file_appender =
                 RollingFileAppender::new(config.rotation.into(), log_dir, file_prefix);

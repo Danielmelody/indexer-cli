@@ -1,0 +1,44 @@
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T12:33:20.728Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T12:33:20.732Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T12:33:20.732Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T12:35:13.478Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T12:35:13.481Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T12:35:13.482Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T13:01:10.021Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T13:01:10.057Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T13:01:28.361Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T13:01:28.370Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T13:01:28.371Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T13:07:28.013Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T16:32:42.675Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T16:32:42.677Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T16:32:42.677Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T16:40:15.378Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T18:36:26.389Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T18:36:26.392Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T18:36:26.392Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T18:37:53.155Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T18:39:38.588Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T18:39:38.590Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T18:39:38.591Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T19:28:30.774Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T19:28:30.777Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T19:28:30.777Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T19:32:56.183Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T19:32:58.943Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-09T19:32:58.948Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-09T19:32:58.948Z"}
+{"level":"info","message":"Fetching URL","method":"GET","service":"fetch-client","timestamp":"2025-11-09T19:33:47.664Z","url":"https://test-ipv6.run/e357c7d007c0e50c7127b590ffc27926.txt"}
+{"duration":348,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":200,"timestamp":"2025-11-09T19:33:48.011Z","url":"https://test-ipv6.run/e357c7d007c0e50c7127b590ffc27926.txt"}
+{"level":"info","message":"Fetching URL","method":"GET","service":"fetch-client","timestamp":"2025-11-09T19:38:33.903Z","url":"https://api.indexnow.org/indexnow?url=https://test-ipv6.run/&key=e357c7d007c0e50c7127b590ffc27926"}
+{"duration":747,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":403,"timestamp":"2025-11-09T19:38:34.650Z","url":"https://api.indexnow.org/indexnow?url=https://test-ipv6.run/&key=e357c7d007c0e50c7127b590ffc27926"}
+{"level":"info","message":"Fetching URL","method":"GET","service":"fetch-client","timestamp":"2025-11-09T19:38:47.278Z","url":"https://test-ipv6.run/e357c7d007c0e50c7127b590ffc27926.txt"}
+{"duration":316,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":200,"timestamp":"2025-11-09T19:38:47.594Z","url":"https://test-ipv6.run/e357c7d007c0e50c7127b590ffc27926.txt"}
+{"level":"info","message":"Fetching URL","method":"POST","service":"fetch-client","timestamp":"2025-11-09T19:38:56.426Z","url":"https://api.indexnow.org/indexnow"}
+{"duration":673,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":403,"timestamp":"2025-11-09T19:38:57.099Z","url":"https://api.indexnow.org/indexnow"}
+{"level":"info","message":"Fetching URL","method":"GET","service":"fetch-client","timestamp":"2025-11-09T19:39:26.802Z","url":"https://test-ipv6.run/robots.txt"}
+{"duration":951,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":200,"timestamp":"2025-11-09T19:39:27.753Z","url":"https://test-ipv6.run/robots.txt"}
+{"level":"info","message":"Fetching URL","method":"POST","service":"fetch-client","timestamp":"2025-11-09T19:46:38.572Z","url":"https://api.indexnow.org/indexnow"}
+{"duration":831,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":403,"timestamp":"2025-11-09T19:46:39.402Z","url":"https://api.indexnow.org/indexnow"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T20:07:44.671Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-10T09:52:45.550Z"}

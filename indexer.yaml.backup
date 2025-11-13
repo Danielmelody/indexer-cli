@@ -1,20 +1,19 @@
 google:
   enabled: true
   auth:
-    service_account_file: /Users/danielhu/Downloads/indexer-477709-1477b7f11707.json
+    service_account_file: /tmp/test-service-account.json
   quota:
     daily_limit: 200
     rate_limit: 380
   batch_size: 100
 indexnow:
   enabled: true
-  api_key: 3491d67672b540b59a57160cde4c67c9
-  key_location: https://test-ipv6.run/3491d67672b540b59a57160cde4c67c9.txt
+  api_key: e357c7d007c0e50c7127b590ffc27926
+  key_location: https://test-ipv6.run/e357c7d007c0e50c7127b590ffc27926.txt
   endpoints:
-    - https://api.indexnow.org/indexnow
-    - https://www.bing.com/indexnow
-    - https://yandex.com/indexnow
-    - https://www.duckduckgo.com/indexnow
+  - https://api.indexnow.org/indexnow
+  - https://www.bing.com/indexnow
+  - https://yandex.com/indexnow
   batch_size: 10000
 sitemap: null
 history:

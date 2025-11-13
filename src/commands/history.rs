@@ -274,13 +274,7 @@ fn get_database_connection(_cli: &Cli) -> Result<rusqlite::Connection> {
     }
 
     // Expand tilde in database path
-    let db_path_str = &config.history.database_path;
-    let db_path = if db_path_str.starts_with("~/") {
-        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-        PathBuf::from(db_path_str.replacen("~", &home, 1))
-    } else {
-        PathBuf::from(db_path_str)
-    };
+    let db_path = crate::config::expand_tilde(&config.history.database_path);
 
     // Initialize database
     init_database(&db_path)
@@ -435,9 +429,7 @@ fn display_as_csv(submissions: &[crate::database::models::SubmissionRecord]) -> 
             sub.api.to_string(),
             sub.action.to_string(),
             sub.status.to_string(),
-            sub.response_code
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
+            sub.response_code.map(|c| c.to_string()).unwrap_or_default(),
             sub.response_message.clone().unwrap_or_default(),
             sub.submitted_at.to_rfc3339(),
         ])
@@ -647,9 +639,7 @@ fn export_to_csv(
             sub.api.to_string(),
             sub.action.to_string(),
             sub.status.to_string(),
-            sub.response_code
-                .map(|c| c.to_string())
-                .unwrap_or_default(),
+            sub.response_code.map(|c| c.to_string()).unwrap_or_default(),
             sub.response_message.clone().unwrap_or_default(),
             sub.submitted_at.to_rfc3339(),
         ])

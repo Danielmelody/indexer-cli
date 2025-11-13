@@ -112,10 +112,10 @@ indexer-cli google verify
 indexer-cli google quota
 
 # 检查 URL 索引状态
-indexer-cli google status --url https://example.com/page
+indexer-cli google status --url https://your-site.com/page
 
 # 提交单个 URL
-indexer-cli submit --url https://example.com/page
+indexer-cli submit --url https://your-site.com/page
 
 # 提交多个 URLs
 indexer-cli submit --file urls.txt

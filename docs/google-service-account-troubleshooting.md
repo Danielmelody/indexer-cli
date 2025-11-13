@@ -137,6 +137,37 @@ A: Check these:
 3. Verify you're using the latest JSON file you just downloaded
 4. Make sure the file hasn't been edited or corrupted
 
+## Configuration File Issues
+
+**Q: After running setup, verify still shows the old/wrong file**
+
+A: This can happen if you have an old `indexer.yaml` file. Solution:
+
+1. Delete or backup the old config:
+   ```bash
+   rm indexer.yaml  # or: mv indexer.yaml indexer.yaml.backup
+   ```
+
+2. Re-run setup with your file:
+   ```bash
+   indexer-cli google setup --service-account ~/path/to/your-file.json
+   ```
+
+3. Verify the config was saved correctly:
+   ```bash
+   cat indexer.yaml | grep service_account_file
+   ```
+
+   Should show your file path under `auth.service_account_file`
+
+**Q: Why does the config have two places for service_account_file?**
+
+A: For backward compatibility:
+- `google.auth.service_account_file` - New location (recommended)
+- `google.service_account_file` - Legacy location
+
+The verify command checks the new location first, then falls back to legacy.
+
 ## Need Help?
 
 If you continue to have issues:

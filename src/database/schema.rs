@@ -86,14 +86,16 @@ pub fn init_database(db_path: &Path) -> Result<Connection, IndexerError> {
     })?;
 
     // Enable foreign key support
-    conn.execute("PRAGMA foreign_keys = ON", [])
-        .map_err(|e| IndexerError::DatabaseQueryFailed {
+    conn.execute("PRAGMA foreign_keys = ON", []).map_err(|e| {
+        IndexerError::DatabaseQueryFailed {
             message: format!("Failed to enable foreign keys: {}", e),
-        })?;
+        }
+    })?;
 
     // Enable WAL mode for better concurrency
     // Note: PRAGMA journal_mode returns a result, so we need to use query_row instead of execute
-    let _: String = conn.query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))
+    let _: String = conn
+        .query_row("PRAGMA journal_mode = WAL", [], |row| row.get(0))
         .map_err(|e| IndexerError::DatabaseQueryFailed {
             message: format!("Failed to enable WAL mode: {}", e),
         })?;
@@ -118,10 +120,11 @@ pub fn init_database(db_path: &Path) -> Result<Connection, IndexerError> {
 pub(crate) fn create_schema_version_table(conn: &Connection) -> Result<(), IndexerError> {
     debug!("Creating schema_version table");
 
-    conn.execute(CREATE_SCHEMA_VERSION_TABLE, [])
-        .map_err(|e| IndexerError::DatabaseQueryFailed {
+    conn.execute(CREATE_SCHEMA_VERSION_TABLE, []).map_err(|e| {
+        IndexerError::DatabaseQueryFailed {
             message: format!("Failed to create schema_version table: {}", e),
-        })?;
+        }
+    })?;
 
     // Check if we need to initialize the version
     let version_exists: bool = conn

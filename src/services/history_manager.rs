@@ -7,8 +7,8 @@
 use crate::database::{
     models::{ActionType, ApiType, SubmissionRecord, SubmissionStatus},
     queries::{
-        check_url_submitted, count_submissions, delete_old_submissions,
-        get_submissions_stats, insert_submission, list_submissions, SubmissionFilters,
+        check_url_submitted, count_submissions, delete_old_submissions, get_submissions_stats,
+        insert_submission, list_submissions, SubmissionFilters,
     },
     schema::init_database,
 };
@@ -141,11 +141,11 @@ impl HistoryManager {
 
     /// Get a database connection (with automatic reconnection if needed)
     fn get_connection(&self) -> Result<std::sync::MutexGuard<'_, Connection>, IndexerError> {
-        self.connection.lock().map_err(|e| {
-            IndexerError::DatabaseConnectionFailed {
+        self.connection
+            .lock()
+            .map_err(|e| IndexerError::DatabaseConnectionFailed {
                 message: format!("Failed to acquire database lock: {}", e),
-            }
-        })
+            })
     }
 
     /// Record a single URL submission
@@ -172,7 +172,7 @@ impl HistoryManager {
     /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let manager = HistoryManager::new(Path::new("./data/indexer.db"), 90)?;
     /// let id = manager.record_submission(
-    ///     "https://example.com/page",
+    ///     "https://placeholder.test/page",
     ///     ApiType::Google,
     ///     ActionType::UrlUpdated,
     ///     SubmissionStatus::Success,
@@ -238,13 +238,13 @@ impl HistoryManager {
     ///
     /// let records = vec![
     ///     SubmissionRecord::builder()
-    ///         .url("https://example.com/page1")
+    ///         .url("https://placeholder.test/page1")
     ///         .api(ApiType::Google)
     ///         .action(ActionType::UrlUpdated)
     ///         .status(SubmissionStatus::Success)
     ///         .build()?,
     ///     SubmissionRecord::builder()
-    ///         .url("https://example.com/page2")
+    ///         .url("https://placeholder.test/page2")
     ///         .api(ApiType::IndexNow)
     ///         .action(ActionType::UrlUpdated)
     ///         .status(SubmissionStatus::Success)
@@ -312,7 +312,7 @@ impl HistoryManager {
     ///
     /// let one_day_ago = Utc::now() - Duration::days(1);
     /// let submitted = manager.is_url_submitted(
-    ///     "https://example.com/page",
+    ///     "https://placeholder.test/page",
     ///     ApiType::Google,
     ///     one_day_ago
     /// )?;
@@ -355,7 +355,7 @@ impl HistoryManager {
     /// let manager = HistoryManager::new(Path::new("./data/indexer.db"), 90)?;
     ///
     /// let history = manager.get_submission_history(
-    ///     "https://example.com/page",
+    ///     "https://placeholder.test/page",
     ///     ApiType::Google
     /// )?;
     ///
@@ -372,7 +372,9 @@ impl HistoryManager {
     ) -> Result<Vec<SubmissionRecord>, IndexerError> {
         let conn = self.get_connection()?;
 
-        let filters = SubmissionFilters::new().url_pattern(url.to_string()).api(api);
+        let filters = SubmissionFilters::new()
+            .url_pattern(url.to_string())
+            .api(api);
 
         list_submissions(&conn, &filters)
     }
@@ -518,7 +520,10 @@ impl HistoryManager {
     /// ```
     pub fn clean_old_records(&self, days: i64) -> Result<usize, IndexerError> {
         if days <= 0 {
-            warn!("Invalid days value for cleanup: {}. Skipping cleanup.", days);
+            warn!(
+                "Invalid days value for cleanup: {}. Skipping cleanup.",
+                days
+            );
             return Ok(0);
         }
 
@@ -585,21 +590,18 @@ impl HistoryManager {
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = output_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                IndexerError::DirectoryCreationFailed {
-                    path: parent.to_path_buf(),
-                    message: e.to_string(),
-                }
+            std::fs::create_dir_all(parent).map_err(|e| IndexerError::DirectoryCreationFailed {
+                path: parent.to_path_buf(),
+                message: e.to_string(),
             })?;
         }
 
         // Write CSV
-        let file = std::fs::File::create(output_path).map_err(|e| {
-            IndexerError::FileWriteError {
+        let file =
+            std::fs::File::create(output_path).map_err(|e| IndexerError::FileWriteError {
                 path: output_path.to_path_buf(),
                 message: e.to_string(),
-            }
-        })?;
+            })?;
 
         let mut writer = csv::Writer::from_writer(file);
 
@@ -655,10 +657,7 @@ impl HistoryManager {
             message: format!("Failed to flush CSV writer: {}", e),
         })?;
 
-        info!(
-            "Successfully exported {} records to CSV",
-            records.len()
-        );
+        info!("Successfully exported {} records to CSV", records.len());
         Ok(records.len())
     }
 
@@ -706,31 +705,25 @@ impl HistoryManager {
 
         // Create parent directory if it doesn't exist
         if let Some(parent) = output_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                IndexerError::DirectoryCreationFailed {
-                    path: parent.to_path_buf(),
-                    message: e.to_string(),
-                }
+            std::fs::create_dir_all(parent).map_err(|e| IndexerError::DirectoryCreationFailed {
+                path: parent.to_path_buf(),
+                message: e.to_string(),
             })?;
         }
 
         // Write JSON
-        let json =
-            serde_json::to_string_pretty(&records).map_err(|e| {
-                IndexerError::JsonSerializationError {
-                    message: e.to_string(),
-                }
-            })?;
+        let json = serde_json::to_string_pretty(&records).map_err(|e| {
+            IndexerError::JsonSerializationError {
+                message: e.to_string(),
+            }
+        })?;
 
         std::fs::write(output_path, json).map_err(|e| IndexerError::FileWriteError {
             path: output_path.to_path_buf(),
             message: e.to_string(),
         })?;
 
-        info!(
-            "Successfully exported {} records to JSON",
-            records.len()
-        );
+        info!("Successfully exported {} records to JSON", records.len());
         Ok(records.len())
     }
 
@@ -769,7 +762,7 @@ mod tests {
 
         let id = manager
             .record_submission(
-                "https://example.com/test",
+                "https://placeholder.test/test",
                 ApiType::Google,
                 ActionType::UrlUpdated,
                 SubmissionStatus::Success,
@@ -786,14 +779,14 @@ mod tests {
 
         let records = vec![
             SubmissionRecord::builder()
-                .url("https://example.com/page1")
+                .url("https://placeholder.test/page1")
                 .api(ApiType::Google)
                 .action(ActionType::UrlUpdated)
                 .status(SubmissionStatus::Success)
                 .build()
                 .unwrap(),
             SubmissionRecord::builder()
-                .url("https://example.com/page2")
+                .url("https://placeholder.test/page2")
                 .api(ApiType::IndexNow)
                 .action(ActionType::UrlUpdated)
                 .status(SubmissionStatus::Success)
@@ -811,7 +804,7 @@ mod tests {
 
         manager
             .record_submission(
-                "https://example.com/test",
+                "https://placeholder.test/test",
                 ApiType::Google,
                 ActionType::UrlUpdated,
                 SubmissionStatus::Success,
@@ -821,13 +814,21 @@ mod tests {
 
         let one_hour_ago = Utc::now() - Duration::hours(1);
         let submitted = manager
-            .is_url_submitted("https://example.com/test", ApiType::Google, one_hour_ago)
+            .is_url_submitted(
+                "https://placeholder.test/test",
+                ApiType::Google,
+                one_hour_ago,
+            )
             .unwrap();
         assert!(submitted);
 
         let one_hour_future = Utc::now() + Duration::hours(1);
         let not_submitted = manager
-            .is_url_submitted("https://example.com/test", ApiType::Google, one_hour_future)
+            .is_url_submitted(
+                "https://placeholder.test/test",
+                ApiType::Google,
+                one_hour_future,
+            )
             .unwrap();
         assert!(!not_submitted);
     }
@@ -838,7 +839,7 @@ mod tests {
 
         manager
             .record_submission(
-                "https://example.com/test",
+                "https://placeholder.test/test",
                 ApiType::Google,
                 ActionType::UrlUpdated,
                 SubmissionStatus::Success,
@@ -847,11 +848,11 @@ mod tests {
             .unwrap();
 
         let history = manager
-            .get_submission_history("https://example.com/test", ApiType::Google)
+            .get_submission_history("https://placeholder.test/test", ApiType::Google)
             .unwrap();
 
         assert_eq!(history.len(), 1);
-        assert_eq!(history[0].url, "https://example.com/test");
+        assert_eq!(history[0].url, "https://placeholder.test/test");
     }
 
     #[test]
@@ -862,7 +863,7 @@ mod tests {
         for i in 1..=10 {
             manager
                 .record_submission(
-                    &format!("https://example.com/page{}", i),
+                    &format!("https://placeholder.test/page{}", i),
                     if i % 2 == 0 {
                         ApiType::Google
                     } else {
@@ -895,7 +896,7 @@ mod tests {
         for i in 1..=5 {
             manager
                 .record_submission(
-                    &format!("https://example.com/page{}", i),
+                    &format!("https://placeholder.test/page{}", i),
                     ApiType::Google,
                     ActionType::UrlUpdated,
                     SubmissionStatus::Success,
@@ -914,7 +915,7 @@ mod tests {
 
         manager
             .record_submission(
-                "https://example.com/test",
+                "https://placeholder.test/test",
                 ApiType::Google,
                 ActionType::UrlUpdated,
                 SubmissionStatus::Success,
@@ -935,7 +936,7 @@ mod tests {
 
         manager
             .record_submission(
-                "https://example.com/test",
+                "https://placeholder.test/test",
                 ApiType::Google,
                 ActionType::UrlUpdated,
                 SubmissionStatus::Success,

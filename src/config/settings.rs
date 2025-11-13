@@ -85,21 +85,19 @@ impl Default for GoogleConfig {
     }
 }
 
+impl GoogleConfig {
+    /// Returns the configured service account path, preferring the new auth field
+    pub fn service_account_path(&self) -> Option<PathBuf> {
+        self.auth
+            .service_account_file
+            .clone()
+            .or_else(|| self.service_account_file.clone())
+    }
+}
+
 /// Google authentication configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoogleAuthConfig {
-    /// Authentication method (oauth or service_account)
-    #[serde(default = "default_auth_method")]
-    pub method: GoogleAuthMethod,
-
-    /// OAuth client ID (optional, uses default if not specified)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub oauth_client_id: Option<String>,
-
-    /// OAuth client secret (optional, uses default if not specified)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub oauth_client_secret: Option<String>,
-
     /// Service account file path (for service_account method)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub service_account_file: Option<PathBuf>,
@@ -108,32 +106,9 @@ pub struct GoogleAuthConfig {
 impl Default for GoogleAuthConfig {
     fn default() -> Self {
         Self {
-            method: default_auth_method(),
-            oauth_client_id: None,
-            oauth_client_secret: None,
             service_account_file: None,
         }
     }
-}
-
-/// Google authentication method
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum GoogleAuthMethod {
-    /// OAuth 2.0 user authentication
-    OAuth,
-    /// Service account authentication
-    ServiceAccount,
-}
-
-impl Default for GoogleAuthMethod {
-    fn default() -> Self {
-        GoogleAuthMethod::OAuth
-    }
-}
-
-fn default_auth_method() -> GoogleAuthMethod {
-    GoogleAuthMethod::OAuth
 }
 
 /// API quota configuration
@@ -398,7 +373,9 @@ fn default_priority_min() -> f32 {
 }
 
 fn default_database_path() -> String {
-    "~/.indexer-cli/history.db".to_string()
+    crate::constants::default_database_file_path()
+        .to_string_lossy()
+        .to_string()
 }
 
 fn default_retention_days() -> u32 {
@@ -410,7 +387,9 @@ fn default_log_level() -> String {
 }
 
 fn default_log_file() -> String {
-    "~/.indexer-cli/indexer.log".to_string()
+    crate::constants::default_log_file_path()
+        .to_string_lossy()
+        .to_string()
 }
 
 fn default_max_size_mb() -> u32 {

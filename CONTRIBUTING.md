@@ -88,14 +88,14 @@ cargo fmt
 
 ```bash
 # Run with cargo
-cargo run -- submit https://example.com
+cargo run -- submit https://your-site.com
 
 # With debug logging
-RUST_LOG=debug cargo run -- submit https://example.com
+RUST_LOG=debug cargo run -- submit https://your-site.com
 
 # Build and run release version
 cargo build --release
-./target/release/indexer-cli submit https://example.com
+./target/release/indexer-cli submit https://your-site.com
 ```
 
 ### Project Structure
@@ -321,7 +321,7 @@ Example:
 /// # use indexer_cli::api::google_indexing::*;
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let client = GoogleIndexingClient::new(path)?;
-/// let urls = vec!["https://example.com/page1".to_string()];
+/// let urls = vec!["https://your-site.com/page1".to_string()];
 /// let result = client.batch_publish_urls(urls, NotificationType::UrlUpdated).await?;
 /// # Ok(())
 /// # }

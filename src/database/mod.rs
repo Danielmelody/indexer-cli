@@ -24,7 +24,7 @@
 //!
 //! // Create a submission record
 //! let record = SubmissionRecord::builder()
-//!     .url("https://example.com/page")
+//!     .url("https://placeholder.test/page")
 //!     .api(ApiType::Google)
 //!     .action(ActionType::UrlUpdated)
 //!     .status(SubmissionStatus::Success)
@@ -36,7 +36,7 @@
 //! println!("Inserted record with ID: {}", id);
 //!
 //! // Query the record
-//! let retrieved = get_submission_by_url(&conn, "https://example.com/page", ApiType::Google)?;
+//! let retrieved = get_submission_by_url(&conn, "https://placeholder.test/page", ApiType::Google)?;
 //! if let Some(record) = retrieved {
 //!     println!("Found record: {:?}", record);
 //! }
@@ -61,6 +61,5 @@ pub use schema::{create_tables, get_schema_version, init_database, migrate_datab
 // Query functions
 pub use queries::{
     check_url_submitted, count_submissions, delete_old_submissions, get_submission_by_url,
-    get_submissions_stats, insert_submission, list_submissions, SubmissionFilters,
-    SubmissionStats,
+    get_submissions_stats, insert_submission, list_submissions, SubmissionFilters, SubmissionStats,
 };

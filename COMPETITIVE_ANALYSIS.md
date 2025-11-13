@@ -521,7 +521,7 @@ google:
 
 indexnow:
   key: "your-api-key"
-  key_location: "https://example.com/your-api-key.txt"
+  key_location: "https://your-site.com/your-api-key.txt"
   batch_size: 10000
 
 logging:

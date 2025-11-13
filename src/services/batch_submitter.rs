@@ -170,15 +170,27 @@ impl BatchResult {
 
     /// Get total successful submissions across all APIs
     pub fn total_successful(&self) -> usize {
-        let google = self.google_results.as_ref().map(|r| r.successful).unwrap_or(0);
-        let indexnow = self.indexnow_results.as_ref().map(|r| r.successful).unwrap_or(0);
+        let google = self
+            .google_results
+            .as_ref()
+            .map(|r| r.successful)
+            .unwrap_or(0);
+        let indexnow = self
+            .indexnow_results
+            .as_ref()
+            .map(|r| r.successful)
+            .unwrap_or(0);
         google + indexnow
     }
 
     /// Get total failed submissions across all APIs
     pub fn total_failed(&self) -> usize {
         let google = self.google_results.as_ref().map(|r| r.failed).unwrap_or(0);
-        let indexnow = self.indexnow_results.as_ref().map(|r| r.failed).unwrap_or(0);
+        let indexnow = self
+            .indexnow_results
+            .as_ref()
+            .map(|r| r.failed)
+            .unwrap_or(0);
         google + indexnow
     }
 
@@ -309,11 +321,12 @@ impl BatchSubmitter {
         urls: Vec<String>,
         action: NotificationType,
     ) -> Result<BatchResult, IndexerError> {
-        let google_client = self.google_client.as_ref().ok_or_else(|| {
-            IndexerError::ConfigMissingField {
-                field: "google_client".to_string(),
-            }
-        })?;
+        let google_client =
+            self.google_client
+                .as_ref()
+                .ok_or_else(|| IndexerError::ConfigMissingField {
+                    field: "google_client".to_string(),
+                })?;
 
         info!(
             "Starting Google batch submission: {} URLs with action {:?}",
@@ -363,7 +376,11 @@ impl BatchSubmitter {
             .map(|chunk| chunk.to_vec())
             .collect();
 
-        info!("Processing {} batches of up to {} URLs each", batches.len(), self.config.google_batch_size);
+        info!(
+            "Processing {} batches of up to {} URLs each",
+            batches.len(),
+            self.config.google_batch_size
+        );
 
         // Process batches concurrently
         let mut batch_stream = stream::iter(batches)
@@ -393,7 +410,9 @@ impl BatchSubmitter {
                                 } else {
                                     SubmissionStatus::Failed
                                 })
-                                .response_code(sub_result.status_code.map(|c| c as i32).unwrap_or(0))
+                                .response_code(
+                                    sub_result.status_code.map(|c| c as i32).unwrap_or(0),
+                                )
                                 .response_message(sub_result.message.clone())
                                 .submitted_at(sub_result.submitted_at)
                                 .build(),
@@ -464,15 +483,13 @@ impl BatchSubmitter {
     /// # Returns
     ///
     /// Returns the batch submission result
-    pub async fn submit_to_indexnow(
-        &self,
-        urls: Vec<String>,
-    ) -> Result<BatchResult, IndexerError> {
-        let indexnow_client = self.indexnow_client.as_ref().ok_or_else(|| {
-            IndexerError::ConfigMissingField {
-                field: "indexnow_client".to_string(),
-            }
-        })?;
+    pub async fn submit_to_indexnow(&self, urls: Vec<String>) -> Result<BatchResult, IndexerError> {
+        let indexnow_client =
+            self.indexnow_client
+                .as_ref()
+                .ok_or_else(|| IndexerError::ConfigMissingField {
+                    field: "indexnow_client".to_string(),
+                })?;
 
         info!("Starting IndexNow batch submission: {} URLs", urls.len());
 
@@ -518,61 +535,95 @@ impl BatchSubmitter {
             .map(|chunk| chunk.to_vec())
             .collect();
 
-        info!("Processing {} batches of up to {} URLs each", batches.len(), self.config.indexnow_batch_size);
+        info!(
+            "Processing {} batches of up to {} URLs each",
+            batches.len(),
+            self.config.indexnow_batch_size
+        );
+
+        info!(
+            "Submitting to {} IndexNow endpoints: {}",
+            indexnow_client.endpoints().len(),
+            indexnow_client.endpoints().join(", ")
+        );
 
         // Process batches - submit to all endpoints concurrently
         for batch in batches {
             let batch_size = batch.len();
             let responses = indexnow_client.submit_to_all(&batch).await;
 
-            // Process responses from all endpoints
+            // Track whether ALL endpoints accepted the batch
+            let total_endpoints = responses.len();
+            let mut successful_endpoints = 0;
+            let mut batch_errors = Vec::new();
+
             for (idx, response) in responses.iter().enumerate() {
                 match response {
                     Ok(resp) => {
                         if resp.is_success() {
-                            // Only count success once per URL (from first endpoint)
-                            if idx == 0 {
-                                api_results.successful += batch_size;
-                            }
-                            debug!("IndexNow endpoint {} successful: {}", resp.endpoint, batch_size);
+                            successful_endpoints += 1;
+                            info!(
+                                "✓ IndexNow endpoint {} - Status: {} - {}",
+                                resp.endpoint, resp.status_code, resp.message
+                            );
                         } else {
-                            warn!("IndexNow endpoint {} failed: {}", resp.endpoint, resp.message);
-                            if idx == 0 {
-                                api_results.add_failure(format!(
-                                    "Endpoint {}: {}",
-                                    resp.endpoint, resp.message
-                                ));
-                            }
+                            warn!(
+                                "✗ IndexNow endpoint {} - Status: {} - {}",
+                                resp.endpoint, resp.status_code, resp.message
+                            );
+                            batch_errors.push(format!(
+                                "Endpoint {}: {}",
+                                resp.endpoint, resp.message
+                            ));
                         }
                     }
                     Err(e) => {
-                        error!("IndexNow submission error: {}", e);
-                        if idx == 0 {
-                            api_results.add_failure(e.to_string());
-                        }
+                        let endpoint_name = indexnow_client
+                            .endpoints()
+                            .get(idx)
+                            .map(|s| s.as_str())
+                            .unwrap_or("<unknown endpoint>");
+                        error!("✗ IndexNow endpoint {} - Error: {}", endpoint_name, e);
+                        batch_errors.push(format!("Endpoint {}: {}", endpoint_name, e));
                     }
                 }
             }
 
-            // Record to history (use first response status)
-            let is_success = responses.first().map(|r| r.is_ok()).unwrap_or(false);
+            // Require ALL endpoints to succeed
+            let batch_success = successful_endpoints == total_endpoints;
+
+            if batch_success {
+                info!("All {} IndexNow endpoints accepted batch: {} URLs", total_endpoints, batch_size);
+                api_results.successful += batch_size;
+            } else {
+                warn!(
+                    "IndexNow batch partially failed: {}/{} endpoints successful",
+                    successful_endpoints, total_endpoints
+                );
+                api_results.failed += batch_size;
+                if batch_errors.is_empty() {
+                    batch_errors.push("IndexNow submission failed with unknown error".to_string());
+                }
+                api_results.errors.push(batch_errors.join(" | "));
+            }
+
+            // Record to history (mark success only if ALL endpoints succeeded)
+            let response_code = responses
+                .iter()
+                .find_map(|r| r.as_ref().ok().map(|resp| resp.status_code as i32))
+                .unwrap_or(0);
+
             for url in &batch {
                 let record = SubmissionRecord::builder()
                     .url(url.clone())
                     .api(ApiType::IndexNow)
                     .action(ActionType::UrlUpdated)
-                    .status(if is_success {
+                    .status(if batch_success {
                         SubmissionStatus::Success
                     } else {
                         SubmissionStatus::Failed
                     })
-                    .response_code(
-                        responses
-                            .first()
-                            .and_then(|r| r.as_ref().ok())
-                            .map(|r| r.status_code as i32)
-                            .unwrap_or(0),
-                    )
+                    .response_code(response_code)
                     .build();
 
                 if let Ok(rec) = record {
@@ -615,10 +666,7 @@ impl BatchSubmitter {
         urls: Vec<String>,
         action: NotificationType,
     ) -> Result<BatchResult, IndexerError> {
-        info!(
-            "Starting batch submission to all APIs: {} URLs",
-            urls.len()
-        );
+        info!("Starting batch submission to all APIs: {} URLs", urls.len());
 
         let total_urls = urls.len();
         let mut final_result = BatchResult::new(total_urls);
@@ -642,9 +690,8 @@ impl BatchSubmitter {
                 config: self.config.clone(),
             };
 
-            let handle = tokio::spawn(async move {
-                self_clone.submit_to_google(urls_clone, action).await
-            });
+            let handle =
+                tokio::spawn(async move { self_clone.submit_to_google(urls_clone, action).await });
             handles.push(("google", handle));
         }
 
@@ -658,30 +705,27 @@ impl BatchSubmitter {
                 config: self.config.clone(),
             };
 
-            let handle = tokio::spawn(async move {
-                self_clone.submit_to_indexnow(urls_clone).await
-            });
+            let handle =
+                tokio::spawn(async move { self_clone.submit_to_indexnow(urls_clone).await });
             handles.push(("indexnow", handle));
         }
 
         // Wait for all submissions to complete
         for (api_name, handle) in handles {
             match handle.await {
-                Ok(Ok(result)) => {
-                    match api_name {
-                        "google" => {
-                            final_result.google_results = result.google_results;
-                            final_result.submitted = final_result.submitted.max(result.submitted);
-                            final_result.skipped = final_result.skipped.max(result.skipped);
-                        }
-                        "indexnow" => {
-                            final_result.indexnow_results = result.indexnow_results;
-                            final_result.submitted = final_result.submitted.max(result.submitted);
-                            final_result.skipped = final_result.skipped.max(result.skipped);
-                        }
-                        _ => {}
+                Ok(Ok(result)) => match api_name {
+                    "google" => {
+                        final_result.google_results = result.google_results;
+                        final_result.submitted = final_result.submitted.max(result.submitted);
+                        final_result.skipped = final_result.skipped.max(result.skipped);
                     }
-                }
+                    "indexnow" => {
+                        final_result.indexnow_results = result.indexnow_results;
+                        final_result.submitted = final_result.submitted.max(result.submitted);
+                        final_result.skipped = final_result.skipped.max(result.skipped);
+                    }
+                    _ => {}
+                },
                 Ok(Err(e)) => {
                     error!("API {} submission failed: {}", api_name, e);
                 }
@@ -719,11 +763,7 @@ impl BatchSubmitter {
         api: ApiType,
         since: Option<ChronoDuration>,
     ) -> Result<Vec<String>, IndexerError> {
-        debug!(
-            "Filtering {} URLs against {} history",
-            urls.len(),
-            api
-        );
+        debug!("Filtering {} URLs against {} history", urls.len(), api);
 
         let since_timestamp = since.map(|d| Utc::now() - d);
         let mut filtered = Vec::new();

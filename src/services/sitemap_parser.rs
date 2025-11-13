@@ -79,6 +79,8 @@ impl SitemapParser {
             .user_agent("Mozilla/5.0 (compatible; IndexerCLI/1.0)")
             .gzip(true)
             .timeout(std::time::Duration::from_secs(30))
+            // Disable system proxy auto-detection to avoid macOS SystemConfiguration panics
+            .no_proxy()
             .build()
             .map_err(|e| IndexerError::HttpRequestFailed {
                 message: e.to_string(),
@@ -92,10 +94,7 @@ impl SitemapParser {
     }
 
     /// Create a new sitemap parser with custom settings
-    pub fn with_config(
-        max_recursion_depth: usize,
-        max_urls: usize,
-    ) -> Result<Self, IndexerError> {
+    pub fn with_config(max_recursion_depth: usize, max_urls: usize) -> Result<Self, IndexerError> {
         let mut parser = Self::new()?;
         parser.max_recursion_depth = max_recursion_depth;
         parser.max_urls = max_urls;
@@ -139,15 +138,15 @@ impl SitemapParser {
     async fn download_sitemap(&self, url: &str) -> Result<String, IndexerError> {
         debug!("Downloading sitemap from: {}", url);
 
-        let response = self
-            .client
-            .get(url)
-            .send()
-            .await
-            .map_err(|e| IndexerError::SitemapDownloadFailed {
-                url: url.to_string(),
-                message: e.to_string(),
-            })?;
+        let response =
+            self.client
+                .get(url)
+                .send()
+                .await
+                .map_err(|e| IndexerError::SitemapDownloadFailed {
+                    url: url.to_string(),
+                    message: e.to_string(),
+                })?;
 
         if !response.status().is_success() {
             return Err(IndexerError::SitemapDownloadFailed {
@@ -289,10 +288,7 @@ impl SitemapParser {
 
             // Check URL limit
             if all_urls.len() > self.max_urls {
-                warn!(
-                    "Reached maximum URL limit of {}, stopping",
-                    self.max_urls
-                );
+                warn!("Reached maximum URL limit of {}, stopping", self.max_urls);
                 all_urls.truncate(self.max_urls);
                 break;
             }
@@ -500,7 +496,7 @@ mod tests {
     fn test_parse_url_element() {
         let xml = r#"
             <url>
-                <loc>https://example.com/page1</loc>
+                <loc>https://placeholder.test/page1</loc>
                 <lastmod>2024-01-15</lastmod>
                 <changefreq>weekly</changefreq>
                 <priority>0.8</priority>
@@ -513,7 +509,7 @@ mod tests {
 
         let sitemap_url = parser.parse_url_element(&url_node).unwrap();
 
-        assert_eq!(sitemap_url.loc, "https://example.com/page1");
+        assert_eq!(sitemap_url.loc, "https://placeholder.test/page1");
         assert_eq!(sitemap_url.changefreq, Some("weekly".to_string()));
         assert_eq!(sitemap_url.priority, Some(0.8));
     }
@@ -523,7 +519,7 @@ mod tests {
         let index_xml = r#"
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                 <sitemap>
-                    <loc>https://example.com/sitemap1.xml</loc>
+                    <loc>https://placeholder.test/sitemap1.xml</loc>
                 </sitemap>
             </sitemapindex>
         "#;
@@ -534,7 +530,7 @@ mod tests {
         let regular_xml = r#"
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
                 <url>
-                    <loc>https://example.com/page1</loc>
+                    <loc>https://placeholder.test/page1</loc>
                 </url>
             </urlset>
         "#;
@@ -573,13 +569,13 @@ mod tests {
 
         let urls = vec![
             SitemapUrl {
-                loc: "https://example.com/page1".to_string(),
+                loc: "https://placeholder.test/page1".to_string(),
                 lastmod: None,
                 changefreq: None,
                 priority: Some(0.8),
             },
             SitemapUrl {
-                loc: "https://example.com/page2".to_string(),
+                loc: "https://placeholder.test/page2".to_string(),
                 lastmod: None,
                 changefreq: None,
                 priority: Some(0.5),
@@ -594,6 +590,6 @@ mod tests {
 
         let filtered = parser.filter_urls(urls, &filters);
         assert_eq!(filtered.len(), 1);
-        assert_eq!(filtered[0].loc, "https://example.com/page1");
+        assert_eq!(filtered[0].loc, "https://placeholder.test/page1");
     }
 }

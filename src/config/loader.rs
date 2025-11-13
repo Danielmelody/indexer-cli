@@ -59,9 +59,7 @@ pub fn load_config() -> Result<Settings> {
     );
 
     // Build and deserialize
-    let config = builder
-        .build()
-        .context("Failed to build configuration")?;
+    let config = builder.build().context("Failed to build configuration")?;
 
     let settings: Settings = config
         .try_deserialize()
@@ -173,12 +171,10 @@ pub fn get_config_dir() -> Option<PathBuf> {
 
 /// Ensure the global configuration directory exists
 pub fn ensure_config_dir() -> Result<PathBuf> {
-    let config_dir = get_config_dir()
-        .context("Failed to determine home directory")?;
+    let config_dir = get_config_dir().context("Failed to determine home directory")?;
 
     if !config_dir.exists() {
-        std::fs::create_dir_all(&config_dir)
-            .context("Failed to create configuration directory")?;
+        std::fs::create_dir_all(&config_dir).context("Failed to create configuration directory")?;
     }
 
     Ok(config_dir)
@@ -191,24 +187,21 @@ pub fn save_to_file<P: AsRef<Path>>(settings: &Settings, path: P) -> Result<()> 
     // Create parent directory if it doesn't exist
     if let Some(parent) = path.parent() {
         if !parent.exists() {
-            std::fs::create_dir_all(parent)
-                .context("Failed to create configuration directory")?;
+            std::fs::create_dir_all(parent).context("Failed to create configuration directory")?;
         }
     }
 
-    let yaml = serde_yaml::to_string(settings)
-        .context("Failed to serialize configuration")?;
+    let yaml = serde_yaml::to_string(settings).context("Failed to serialize configuration")?;
 
-    std::fs::write(path, yaml)
-        .context("Failed to write configuration file")?;
+    std::fs::write(path, yaml).context("Failed to write configuration file")?;
 
     Ok(())
 }
 
 /// Save settings to the global configuration file
 pub fn save_global_config(settings: &Settings) -> Result<PathBuf> {
-    let config_path = get_global_config_path()
-        .context("Failed to determine global configuration path")?;
+    let config_path =
+        get_global_config_path().context("Failed to determine global configuration path")?;
 
     save_to_file(settings, &config_path)?;
 

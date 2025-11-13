@@ -28,7 +28,7 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// let normalized = UrlProcessor::normalize_url("HTTPS://Example.com/Path#fragment").unwrap();
-    /// assert_eq!(normalized, "https://example.com/Path");
+    /// assert_eq!(normalized, "https://placeholder.test/Path");
     /// ```
     pub fn normalize_url(url: &str) -> Result<String, IndexerError> {
         let mut parsed = Url::parse(url).map_err(|_| IndexerError::InvalidUrl {
@@ -65,10 +65,10 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// let normalized = UrlProcessor::normalize_url_with_trailing_slash(
-    ///     "https://example.com/path",
+    ///     "https://placeholder.test/path",
     ///     true
     /// ).unwrap();
-    /// assert_eq!(normalized, "https://example.com/path/");
+    /// assert_eq!(normalized, "https://placeholder.test/path/");
     /// ```
     pub fn normalize_url_with_trailing_slash(
         url: &str,
@@ -106,8 +106,8 @@ impl UrlProcessor {
     /// ```
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
-    /// let host = UrlProcessor::extract_host("https://www.example.com/path?query=1").unwrap();
-    /// assert_eq!(host, "www.example.com");
+    /// let host = UrlProcessor::extract_host("https://www.placeholder.test/path?query=1").unwrap();
+    /// assert_eq!(host, "www.placeholder.test");
     /// ```
     pub fn extract_host(url: &str) -> Result<String, IndexerError> {
         let parsed = Url::parse(url).map_err(|_| IndexerError::InvalidUrl {
@@ -140,11 +140,11 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// let urls = vec![
-    ///     "https://example.com/page1".to_string(),
-    ///     "https://example.com/page2".to_string(),
+    ///     "https://placeholder.test/page1".to_string(),
+    ///     "https://placeholder.test/page2".to_string(),
     /// ];
     ///
-    /// assert!(UrlProcessor::validate_urls_for_host(&urls, "example.com").is_ok());
+    /// assert!(UrlProcessor::validate_urls_for_host(&urls, "placeholder.test").is_ok());
     /// ```
     pub fn validate_urls_for_host(urls: &[String], host: &str) -> Result<(), IndexerError> {
         for url in urls {
@@ -175,8 +175,8 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// let urls = vec![
-    ///     "https://example.com/page".to_string(),
-    ///     "https://example.com/page#section".to_string(),
+    ///     "https://placeholder.test/page".to_string(),
+    ///     "https://placeholder.test/page#section".to_string(),
     ///     "HTTPS://EXAMPLE.COM/page".to_string(),
     /// ];
     ///
@@ -229,11 +229,11 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// let urls = vec![
-    ///     "https://example.com/1".to_string(),
-    ///     "https://example.com/2".to_string(),
-    ///     "https://example.com/3".to_string(),
-    ///     "https://example.com/4".to_string(),
-    ///     "https://example.com/5".to_string(),
+    ///     "https://placeholder.test/1".to_string(),
+    ///     "https://placeholder.test/2".to_string(),
+    ///     "https://placeholder.test/3".to_string(),
+    ///     "https://placeholder.test/4".to_string(),
+    ///     "https://placeholder.test/5".to_string(),
     /// ];
     ///
     /// let batches = UrlProcessor::batch_urls(urls, 2);
@@ -272,8 +272,8 @@ impl UrlProcessor {
     /// ```
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
-    /// assert!(UrlProcessor::validate_url("https://example.com").is_ok());
-    /// assert!(UrlProcessor::validate_url("ftp://example.com").is_err());
+    /// assert!(UrlProcessor::validate_url("https://placeholder.test").is_ok());
+    /// assert!(UrlProcessor::validate_url("ftp://placeholder.test").is_err());
     /// ```
     pub fn validate_url(url: &str) -> Result<(), IndexerError> {
         let parsed = Url::parse(url).map_err(|_| IndexerError::InvalidUrl {
@@ -284,7 +284,10 @@ impl UrlProcessor {
         if scheme != "http" && scheme != "https" {
             return Err(IndexerError::UrlValidationFailed {
                 url: url.to_string(),
-                message: format!("Invalid scheme '{}'. Only http and https are supported.", scheme),
+                message: format!(
+                    "Invalid scheme '{}'. Only http and https are supported.",
+                    scheme
+                ),
             });
         }
 
@@ -322,7 +325,7 @@ impl UrlProcessor {
     /// ```
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
-    /// let path = UrlProcessor::extract_path("https://example.com/path/to/page?query=1").unwrap();
+    /// let path = UrlProcessor::extract_path("https://placeholder.test/path/to/page?query=1").unwrap();
     /// assert_eq!(path, "/path/to/page");
     /// ```
     pub fn extract_path(url: &str) -> Result<String, IndexerError> {
@@ -341,10 +344,10 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// let absolute = UrlProcessor::resolve_relative_url(
-    ///     "https://example.com/base/",
+    ///     "https://placeholder.test/base/",
     ///     "page.html"
     /// ).unwrap();
-    /// assert_eq!(absolute, "https://example.com/base/page.html");
+    /// assert_eq!(absolute, "https://placeholder.test/base/page.html");
     /// ```
     pub fn resolve_relative_url(base: &str, relative: &str) -> Result<String, IndexerError> {
         let base_url = Url::parse(base).map_err(|_| IndexerError::InvalidUrl {
@@ -355,7 +358,10 @@ impl UrlProcessor {
             .join(relative)
             .map_err(|_| IndexerError::UrlValidationFailed {
                 url: relative.to_string(),
-                message: format!("Failed to resolve relative URL '{}' with base '{}'", relative, base),
+                message: format!(
+                    "Failed to resolve relative URL '{}' with base '{}'",
+                    relative, base
+                ),
             })?;
 
         Ok(resolved.to_string())
@@ -369,8 +375,8 @@ impl UrlProcessor {
     /// use indexer_cli::services::url_processor::UrlProcessor;
     ///
     /// assert!(UrlProcessor::urls_equal(
-    ///     "https://example.com/page",
-    ///     "https://example.com/page#section"
+    ///     "https://placeholder.test/page",
+    ///     "https://placeholder.test/page#section"
     /// ).unwrap());
     /// ```
     pub fn urls_equal(url1: &str, url2: &str) -> Result<bool, IndexerError> {
@@ -389,31 +395,31 @@ mod tests {
     fn test_normalize_url() {
         // Remove fragment
         assert_eq!(
-            UrlProcessor::normalize_url("https://example.com/page#section").unwrap(),
-            "https://example.com/page"
+            UrlProcessor::normalize_url("https://placeholder.test/page#section").unwrap(),
+            "https://placeholder.test/page"
         );
 
         // Lowercase scheme and host
         assert_eq!(
             UrlProcessor::normalize_url("HTTPS://EXAMPLE.COM/Path").unwrap(),
-            "https://example.com/Path"
+            "https://placeholder.test/Path"
         );
 
         // Remove default ports
         assert_eq!(
-            UrlProcessor::normalize_url("https://example.com:443/page").unwrap(),
-            "https://example.com/page"
+            UrlProcessor::normalize_url("https://placeholder.test:443/page").unwrap(),
+            "https://placeholder.test/page"
         );
 
         assert_eq!(
-            UrlProcessor::normalize_url("http://example.com:80/page").unwrap(),
-            "http://example.com/page"
+            UrlProcessor::normalize_url("http://placeholder.test:80/page").unwrap(),
+            "http://placeholder.test/page"
         );
 
         // Keep non-default ports
         assert_eq!(
-            UrlProcessor::normalize_url("https://example.com:8080/page").unwrap(),
-            "https://example.com:8080/page"
+            UrlProcessor::normalize_url("https://placeholder.test:8080/page").unwrap(),
+            "https://placeholder.test:8080/page"
         );
     }
 
@@ -421,86 +427,92 @@ mod tests {
     fn test_normalize_url_with_trailing_slash() {
         // Add trailing slash
         assert_eq!(
-            UrlProcessor::normalize_url_with_trailing_slash("https://example.com/path", true)
+            UrlProcessor::normalize_url_with_trailing_slash("https://placeholder.test/path", true)
                 .unwrap(),
-            "https://example.com/path/"
+            "https://placeholder.test/path/"
         );
 
         // Don't add to files
         assert_eq!(
-            UrlProcessor::normalize_url_with_trailing_slash("https://example.com/file.html", true)
-                .unwrap(),
-            "https://example.com/file.html"
+            UrlProcessor::normalize_url_with_trailing_slash(
+                "https://placeholder.test/file.html",
+                true
+            )
+            .unwrap(),
+            "https://placeholder.test/file.html"
         );
 
         // Remove trailing slash
         assert_eq!(
-            UrlProcessor::normalize_url_with_trailing_slash("https://example.com/path/", false)
-                .unwrap(),
-            "https://example.com/path"
+            UrlProcessor::normalize_url_with_trailing_slash(
+                "https://placeholder.test/path/",
+                false
+            )
+            .unwrap(),
+            "https://placeholder.test/path"
         );
 
         // Keep root slash
         assert_eq!(
-            UrlProcessor::normalize_url_with_trailing_slash("https://example.com/", false)
+            UrlProcessor::normalize_url_with_trailing_slash("https://placeholder.test/", false)
                 .unwrap(),
-            "https://example.com/"
+            "https://placeholder.test/"
         );
     }
 
     #[test]
     fn test_extract_host() {
         assert_eq!(
-            UrlProcessor::extract_host("https://www.example.com/path?query=1").unwrap(),
-            "www.example.com"
+            UrlProcessor::extract_host("https://www.placeholder.test/path?query=1").unwrap(),
+            "www.placeholder.test"
         );
 
         assert_eq!(
-            UrlProcessor::extract_host("https://example.com:8080/path").unwrap(),
-            "example.com"
+            UrlProcessor::extract_host("https://placeholder.test:8080/path").unwrap(),
+            "placeholder.test"
         );
     }
 
     #[test]
     fn test_validate_urls_for_host() {
         let urls = vec![
-            "https://example.com/page1".to_string(),
-            "https://example.com/page2".to_string(),
+            "https://placeholder.test/page1".to_string(),
+            "https://placeholder.test/page2".to_string(),
         ];
 
-        assert!(UrlProcessor::validate_urls_for_host(&urls, "example.com").is_ok());
+        assert!(UrlProcessor::validate_urls_for_host(&urls, "placeholder.test").is_ok());
 
         let mixed_urls = vec![
-            "https://example.com/page1".to_string(),
+            "https://placeholder.test/page1".to_string(),
             "https://other.com/page2".to_string(),
         ];
 
-        assert!(UrlProcessor::validate_urls_for_host(&mixed_urls, "example.com").is_err());
+        assert!(UrlProcessor::validate_urls_for_host(&mixed_urls, "placeholder.test").is_err());
     }
 
     #[test]
     fn test_deduplicate_urls() {
         let urls = vec![
-            "https://example.com/page".to_string(),
-            "https://example.com/page#section".to_string(),
+            "https://placeholder.test/page".to_string(),
+            "https://placeholder.test/page#section".to_string(),
             "HTTPS://EXAMPLE.COM/page".to_string(),
-            "https://example.com/other".to_string(),
+            "https://placeholder.test/other".to_string(),
         ];
 
         let deduplicated = UrlProcessor::deduplicate_urls(urls).unwrap();
         assert_eq!(deduplicated.len(), 2);
-        assert!(deduplicated.contains(&"https://example.com/page".to_string()));
-        assert!(deduplicated.contains(&"https://example.com/other".to_string()));
+        assert!(deduplicated.contains(&"https://placeholder.test/page".to_string()));
+        assert!(deduplicated.contains(&"https://placeholder.test/other".to_string()));
     }
 
     #[test]
     fn test_batch_urls() {
         let urls = vec![
-            "https://example.com/1".to_string(),
-            "https://example.com/2".to_string(),
-            "https://example.com/3".to_string(),
-            "https://example.com/4".to_string(),
-            "https://example.com/5".to_string(),
+            "https://placeholder.test/1".to_string(),
+            "https://placeholder.test/2".to_string(),
+            "https://placeholder.test/3".to_string(),
+            "https://placeholder.test/4".to_string(),
+            "https://placeholder.test/5".to_string(),
         ];
 
         let batches = UrlProcessor::batch_urls(urls.clone(), 2);
@@ -526,19 +538,19 @@ mod tests {
 
     #[test]
     fn test_validate_url() {
-        assert!(UrlProcessor::validate_url("https://example.com").is_ok());
-        assert!(UrlProcessor::validate_url("http://example.com").is_ok());
-        assert!(UrlProcessor::validate_url("ftp://example.com").is_err());
+        assert!(UrlProcessor::validate_url("https://placeholder.test").is_ok());
+        assert!(UrlProcessor::validate_url("http://placeholder.test").is_ok());
+        assert!(UrlProcessor::validate_url("ftp://placeholder.test").is_err());
         assert!(UrlProcessor::validate_url("not-a-url").is_err());
     }
 
     #[test]
     fn test_validate_urls() {
         let urls = vec![
-            "https://example.com/page1".to_string(),
+            "https://placeholder.test/page1".to_string(),
             "invalid-url".to_string(),
-            "https://example.com/page2".to_string(),
-            "ftp://example.com".to_string(),
+            "https://placeholder.test/page2".to_string(),
+            "ftp://placeholder.test".to_string(),
         ];
 
         let (valid, invalid) = UrlProcessor::validate_urls(urls);
@@ -549,12 +561,12 @@ mod tests {
     #[test]
     fn test_extract_path() {
         assert_eq!(
-            UrlProcessor::extract_path("https://example.com/path/to/page?query=1").unwrap(),
+            UrlProcessor::extract_path("https://placeholder.test/path/to/page?query=1").unwrap(),
             "/path/to/page"
         );
 
         assert_eq!(
-            UrlProcessor::extract_path("https://example.com/").unwrap(),
+            UrlProcessor::extract_path("https://placeholder.test/").unwrap(),
             "/"
         );
     }
@@ -562,40 +574,44 @@ mod tests {
     #[test]
     fn test_resolve_relative_url() {
         assert_eq!(
-            UrlProcessor::resolve_relative_url("https://example.com/base/", "page.html").unwrap(),
-            "https://example.com/base/page.html"
+            UrlProcessor::resolve_relative_url("https://placeholder.test/base/", "page.html")
+                .unwrap(),
+            "https://placeholder.test/base/page.html"
         );
 
         assert_eq!(
-            UrlProcessor::resolve_relative_url("https://example.com/base/page", "../other.html")
-                .unwrap(),
-            "https://example.com/other.html"
+            UrlProcessor::resolve_relative_url(
+                "https://placeholder.test/base/page",
+                "../other.html"
+            )
+            .unwrap(),
+            "https://placeholder.test/other.html"
         );
 
         assert_eq!(
-            UrlProcessor::resolve_relative_url("https://example.com/base/", "/absolute/path")
+            UrlProcessor::resolve_relative_url("https://placeholder.test/base/", "/absolute/path")
                 .unwrap(),
-            "https://example.com/absolute/path"
+            "https://placeholder.test/absolute/path"
         );
     }
 
     #[test]
     fn test_urls_equal() {
         assert!(UrlProcessor::urls_equal(
-            "https://example.com/page",
-            "https://example.com/page#section"
+            "https://placeholder.test/page",
+            "https://placeholder.test/page#section"
         )
         .unwrap());
 
         assert!(UrlProcessor::urls_equal(
             "HTTPS://EXAMPLE.COM/page",
-            "https://example.com/page"
+            "https://placeholder.test/page"
         )
         .unwrap());
 
         assert!(!UrlProcessor::urls_equal(
-            "https://example.com/page1",
-            "https://example.com/page2"
+            "https://placeholder.test/page1",
+            "https://placeholder.test/page2"
         )
         .unwrap());
     }

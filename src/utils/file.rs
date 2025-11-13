@@ -172,7 +172,7 @@ pub fn read_file_sync(path: &Path) -> Result<String> {
 /// let file_content = read_content("/tmp/test.txt").await?;
 ///
 /// // Read from URL
-/// let url_content = read_content("https://example.com/data.txt").await?;
+/// let url_content = read_content("https://placeholder.test/data.txt").await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -341,15 +341,13 @@ pub async fn write_bytes(path: &Path, content: &[u8]) -> Result<()> {
 pub fn expand_path(path_str: &str) -> Result<PathBuf> {
     if path_str.starts_with("~/") {
         // Expand home directory
-        let home = dirs::home_dir()
-            .context("Failed to determine home directory")?;
+        let home = dirs::home_dir().context("Failed to determine home directory")?;
 
         let rest = &path_str[2..]; // Skip "~/"
         Ok(home.join(rest))
     } else if path_str == "~" {
         // Just the home directory
-        dirs::home_dir()
-            .context("Failed to determine home directory")
+        dirs::home_dir().context("Failed to determine home directory")
     } else {
         // No expansion needed
         Ok(PathBuf::from(path_str))
@@ -521,11 +519,20 @@ mod tests {
 
     #[test]
     fn test_get_file_extension() {
-        assert_eq!(get_file_extension(Path::new("test.txt")), Some("txt".to_string()));
-        assert_eq!(get_file_extension(Path::new("test.TAR.GZ")), Some("gz".to_string()));
+        assert_eq!(
+            get_file_extension(Path::new("test.txt")),
+            Some("txt".to_string())
+        );
+        assert_eq!(
+            get_file_extension(Path::new("test.TAR.GZ")),
+            Some("gz".to_string())
+        );
         assert_eq!(get_file_extension(Path::new("test")), None);
         assert_eq!(get_file_extension(Path::new(".hidden")), None);
-        assert_eq!(get_file_extension(Path::new("test.json")), Some("json".to_string()));
+        assert_eq!(
+            get_file_extension(Path::new("test.json")),
+            Some("json".to_string())
+        );
     }
 
     #[test]

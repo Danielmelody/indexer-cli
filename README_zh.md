@@ -15,7 +15,7 @@
 ## 特性
 
 - **Google Indexing API 集成**
-  - 使用服务账号的 OAuth2 身份验证
+  - 使用 Google Cloud 服务账号身份验证
   - 支持 UPDATE/DELETE 操作的 URL 提交
   - 元数据检索和状态检查
   - 智能速率限制和配额管理
@@ -647,6 +647,8 @@ indexer-cli validate --check-key-file
 indexer-cli validate --format json
 ```
 
+> `--check-key-file` 现在会直接下载配置里的 `indexnow.key_location` 并校验文件内容与 API Key 是否一致，让你能立刻知道目标站点是否正确暴露了 IndexNow 密钥文件。
+
 ## Google 设置指南
 
 ### 前置要求
@@ -835,6 +837,21 @@ indexer-cli submit --sitemap https://example.com/sitemap.xml \
   --since 2024-01-01
 ```
 
+### 强制提交
+
+默认情况下，`indexer-cli` 会根据本地历史数据库跳过 24 小时内已提交的 URL。遇到紧急情况需要无视该时间窗口时，可以使用 `--force`（或 `-F`）强制提交，但仍然会记录新的提交记录：
+
+```bash
+# 强制执行统一提交
+indexer-cli submit --sitemap https://example.com/sitemap.xml --force
+
+# 仅 IndexNow
+indexer-cli indexnow submit https://example.com/page1 --force
+
+# 仅 Google
+indexer-cli google submit https://example.com/page1 --force
+```
+
 ### 自定义重试策略
 
 在 `config.yaml` 中配置重试行为：
@@ -946,7 +963,7 @@ indexer-cli submit --sitemap https://example.com/sitemap.xml --dry-run
          │
 ┌────────▼─────────────────────┐
 │       API 客户端             │
-│  - Google Indexing (OAuth2)  │
+│  - Google Indexing (Service Account) │
 │  - IndexNow (HTTP)           │
 └──────────────────────────────┘
 ```
@@ -967,7 +984,7 @@ indexer-cli submit --sitemap https://example.com/sitemap.xml --dry-run
 
 1. **用户输入** → CLI 参数解析
 2. **配置加载** → 合并配置文件 + 环境 + 默认值
-3. **API 客户端初始化** → OAuth2 或 API 密钥身份验证
+3. **API 客户端初始化** → 服务账号或 API 密钥身份验证
 4. **URL 收集** → 从参数、文件或站点地图
 5. **历史检查** → 过滤掉最近提交的 URL
 6. **批处理** → 分批，并发提交
@@ -1198,7 +1215,7 @@ indexer-cli validate
 
 **问：Google Indexing API 和 IndexNow 有什么区别？**
 
-答：Google Indexing API 专门用于 Google 搜索，需要使用服务账号进行 OAuth2 身份验证。它有严格的配额限制（每天 200 个 URL），但提供详细的状态信息。IndexNow 是一个开放协议，受多个搜索引擎（Bing、Yandex、Seznam、Naver）支持，限制更高（每批 10,000 个 URL），但只需要 API 密钥。
+答：Google Indexing API 专门用于 Google 搜索，需要使用服务账号 JSON 密钥进行身份验证。它有严格的配额限制（每天 200 个 URL），但提供详细的状态信息。IndexNow 是一个开放协议，受多个搜索引擎（Bing、Yandex、Seznam、Naver）支持，限制更高（每批 10,000 个 URL），但只需要 API 密钥。
 
 **问：我可以同时使用两个 API 吗？**
 
@@ -1344,7 +1361,7 @@ done
 - [tokio](https://github.com/tokio-rs/tokio) - 异步运行时
 - [reqwest](https://github.com/seanmonstar/reqwest) - HTTP 客户端
 - [rusqlite](https://github.com/rusqlite/rusqlite) - SQLite 绑定
-- [yup-oauth2](https://github.com/dermesser/yup-oauth2) - OAuth2 身份验证
+- [yup-oauth2](https://github.com/dermesser/yup-oauth2) - Google 服务账号身份验证
 - [serde](https://github.com/serde-rs/serde) - 序列化框架
 - [roxmltree](https://github.com/RazrFalcon/roxmltree) - XML 解析
 - [indicatif](https://github.com/console-rs/indicatif) - 进度条

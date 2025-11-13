@@ -86,8 +86,8 @@ impl RetryConfig {
 
     /// Calculate the backoff duration for a given attempt
     fn calculate_backoff(&self, attempt: usize) -> Duration {
-        let base_duration = self.initial_backoff.as_millis() as f64
-            * self.backoff_multiplier.powi(attempt as i32);
+        let base_duration =
+            self.initial_backoff.as_millis() as f64 * self.backoff_multiplier.powi(attempt as i32);
 
         let duration_ms = base_duration.min(self.max_backoff.as_millis() as f64) as u64;
 
@@ -337,8 +337,8 @@ where
 mod tests {
     use super::*;
     use std::fmt;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
 
     // Test error type that implements std::error::Error
     #[derive(Debug)]

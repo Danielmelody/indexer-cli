@@ -1,12 +1,11 @@
 //! Google Indexing API client implementation
 //!
 //! This module provides a comprehensive client for the Google Indexing API v3,
-//! including OAuth2 authentication, URL submission, batch operations, and quota management.
-
-use crate::auth::oauth::GoogleOAuthFlow;
+//! including service-account authentication, URL submission, batch operations, and quota management.
 use crate::types::error::IndexerError;
 use crate::utils::retry::{retry_with_condition, RetryConfig};
 use chrono::{DateTime, Utc};
+use hyper_util::client::legacy::connect::HttpConnector;
 use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -14,7 +13,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
-use hyper_util::client::legacy::connect::HttpConnector;
 use yup_oauth2::{
     authenticator::Authenticator, hyper_rustls::HttpsConnector, ServiceAccountAuthenticator,
 };
@@ -22,8 +20,16 @@ use yup_oauth2::{
 /// Google Indexing API endpoint
 const GOOGLE_INDEXING_API_ENDPOINT: &str = "https://indexing.googleapis.com/v3";
 
+/// Google Search Console API endpoint (webmasters v3)
+/// Note: `/webmasters/v3` is required; `/v1` returns 404.
+const GOOGLE_SEARCH_CONSOLE_API_ENDPOINT: &str =
+    "https://searchconsole.googleapis.com/webmasters/v3";
+
 /// Google Indexing API scope
 const GOOGLE_INDEXING_SCOPE: &str = "https://www.googleapis.com/auth/indexing";
+
+/// Google Search Console API scope (read-only)
+const GOOGLE_SEARCH_CONSOLE_SCOPE: &str = "https://www.googleapis.com/auth/webmasters.readonly";
 
 /// Default batch size for batch operations
 const DEFAULT_BATCH_SIZE: usize = 100;
@@ -166,7 +172,9 @@ impl RateLimiter {
         if self.request_times.len() >= self.max_requests_per_minute {
             if let Some(&oldest) = self.request_times.first() {
                 let wait_until = oldest + chrono::Duration::minutes(1);
-                let wait_duration = (wait_until - now).to_std().unwrap_or(Duration::from_secs(1));
+                let wait_duration = (wait_until - now)
+                    .to_std()
+                    .unwrap_or(Duration::from_secs(1));
 
                 if wait_duration > Duration::ZERO {
                     warn!(
@@ -183,20 +191,12 @@ impl RateLimiter {
     }
 }
 
-/// Authentication method for Google Indexing API
-enum AuthMethod {
-    /// Service account authentication (legacy)
-    ServiceAccount(Arc<Mutex<Authenticator<HttpsConnector<HttpConnector>>>>),
-    /// OAuth 2.0 user authentication
-    OAuth(GoogleOAuthFlow),
-}
-
 /// Google Indexing API client
 pub struct GoogleIndexingClient {
     /// HTTP client
     client: reqwest::Client,
-    /// Authentication method
-    auth: AuthMethod,
+    /// Service account authenticator
+    authenticator: Arc<Mutex<Authenticator<HttpsConnector<HttpConnector>>>>,
     /// Rate limiter
     rate_limiter: Arc<Mutex<RateLimiter>>,
     /// Daily publish limit
@@ -206,47 +206,6 @@ pub struct GoogleIndexingClient {
 }
 
 impl GoogleIndexingClient {
-    /// Create a new Google Indexing API client from OAuth flow
-    ///
-    /// # Returns
-    ///
-    /// Returns a Result containing the client or an error
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - The OAuth flow cannot be initialized
-    /// - The HTTP client cannot be created
-    pub async fn from_oauth() -> Result<Self, IndexerError> {
-        info!("Initializing Google Indexing API client with OAuth");
-
-        let oauth_flow = GoogleOAuthFlow::new()?;
-
-        if !oauth_flow.is_authenticated() {
-            return Err(IndexerError::GoogleAuthError {
-                message: "Not authenticated. Run 'indexer-cli google auth' first".to_string(),
-            });
-        }
-
-        // Create HTTP client
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| IndexerError::HttpRequestFailed {
-                message: e.to_string(),
-            })?;
-
-        Ok(Self {
-            client,
-            auth: AuthMethod::OAuth(oauth_flow),
-            rate_limiter: Arc::new(Mutex::new(RateLimiter::new(
-                DEFAULT_RATE_LIMIT_PER_MINUTE,
-            ))),
-            daily_publish_limit: DEFAULT_DAILY_PUBLISH_LIMIT,
-            batch_size: DEFAULT_BATCH_SIZE,
-        })
-    }
-
     /// Create a new Google Indexing API client from service account file (legacy)
     ///
     /// # Arguments
@@ -288,10 +247,8 @@ impl GoogleIndexingClient {
 
         Ok(Self {
             client,
-            auth: AuthMethod::ServiceAccount(Arc::new(Mutex::new(auth))),
-            rate_limiter: Arc::new(Mutex::new(RateLimiter::new(
-                DEFAULT_RATE_LIMIT_PER_MINUTE,
-            ))),
+            authenticator: Arc::new(Mutex::new(auth)),
+            rate_limiter: Arc::new(Mutex::new(RateLimiter::new(DEFAULT_RATE_LIMIT_PER_MINUTE))),
             daily_publish_limit: DEFAULT_DAILY_PUBLISH_LIMIT,
             batch_size: DEFAULT_BATCH_SIZE,
         })
@@ -330,7 +287,10 @@ impl GoogleIndexingClient {
     async fn create_service_account_authenticator(
         service_account_path: &PathBuf,
     ) -> Result<Authenticator<HttpsConnector<HttpConnector>>, IndexerError> {
-        debug!("Reading service account key from: {:?}", service_account_path);
+        debug!(
+            "Reading service account key from: {:?}",
+            service_account_path
+        );
 
         // Read service account key
         let service_account_key = yup_oauth2::read_service_account_key(&service_account_path)
@@ -342,7 +302,8 @@ impl GoogleIndexingClient {
                 // Check if it's a PEM parsing error
                 if error_msg.contains("Not enough private keys in PEM")
                     || error_msg.contains("private_key")
-                    || error_msg.contains("key") {
+                    || error_msg.contains("key")
+                {
                     IndexerError::GoogleServiceAccountInvalid {
                         message: format!(
                             "Invalid service account JSON: {}. \
@@ -352,9 +313,7 @@ impl GoogleIndexingClient {
                         ),
                     }
                 } else {
-                    IndexerError::GoogleServiceAccountInvalid {
-                        message: error_msg,
-                    }
+                    IndexerError::GoogleServiceAccountInvalid { message: error_msg }
                 }
             })?;
 
@@ -366,7 +325,10 @@ impl GoogleIndexingClient {
             });
         }
 
-        debug!("Service account email: {}", service_account_key.client_email);
+        debug!(
+            "Service account email: {}",
+            service_account_key.client_email
+        );
         debug!("Project ID: {:?}", service_account_key.project_id);
 
         // Create authenticator
@@ -402,33 +364,25 @@ impl GoogleIndexingClient {
     /// - The OAuth2 token request fails
     /// - No access token is returned by the authentication service
     pub async fn authenticate(&self) -> Result<String, IndexerError> {
-        debug!("Authenticating with Google OAuth2");
+        debug!("Authenticating with Google OAuth2 (service account)");
+        self.get_access_token_for_scope(GOOGLE_INDEXING_SCOPE).await
+    }
 
-        match &self.auth {
-            AuthMethod::ServiceAccount(auth) => {
-                let auth = auth.lock().await;
-                let token = auth
-                    .token(&[GOOGLE_INDEXING_SCOPE])
-                    .await
-                    .map_err(|e| IndexerError::GoogleAuthError {
-                        message: e.to_string(),
-                    })?;
+    async fn get_access_token_for_scope(&self, scope: &str) -> Result<String, IndexerError> {
+        let auth = self.authenticator.lock().await;
+        let token = auth
+            .token(&[scope])
+            .await
+            .map_err(|e| IndexerError::GoogleAuthError {
+                message: e.to_string(),
+            })?;
 
-                let access_token = token
-                    .token()
-                    .ok_or_else(|| IndexerError::GoogleAuthError {
-                        message: "No access token returned".to_string(),
-                    })?;
-
-                debug!("Service account authentication successful");
-                Ok(access_token.to_string())
-            }
-            AuthMethod::OAuth(oauth_flow) => {
-                let access_token = oauth_flow.get_access_token().await?;
-                debug!("OAuth authentication successful");
-                Ok(access_token)
-            }
-        }
+        token
+            .token()
+            .ok_or_else(|| IndexerError::GoogleAuthError {
+                message: "No access token returned".to_string(),
+            })
+            .map(|token| token.to_string())
     }
 
     /// Submit a single URL to Google Indexing API
@@ -464,7 +418,7 @@ impl GoogleIndexingClient {
     ///     ).await?;
     ///
     ///     let result = client.publish_url(
-    ///         "https://example.com/page1",
+    ///         "https://placeholder.test/page1",
     ///         NotificationType::UrlUpdated
     ///     ).await?;
     ///
@@ -522,11 +476,11 @@ impl GoogleIndexingClient {
                 // Handle response
                 match status_code {
                     StatusCode::OK => {
-                        let _response_body: UrlNotificationResponse =
-                            response.json().await.map_err(|e| {
-                                IndexerError::JsonDeserializationError {
-                                    message: e.to_string(),
-                                }
+                        let _response_body: UrlNotificationResponse = response
+                            .json()
+                            .await
+                            .map_err(|e| IndexerError::JsonDeserializationError {
+                                message: e.to_string(),
                             })?;
 
                         debug!("Successfully published URL: {}", url);
@@ -617,8 +571,8 @@ impl GoogleIndexingClient {
     ///     ).await?;
     ///
     ///     let urls = vec![
-    ///         "https://example.com/page1".to_string(),
-    ///         "https://example.com/page2".to_string(),
+    ///         "https://placeholder.test/page1".to_string(),
+    ///         "https://placeholder.test/page2".to_string(),
     ///     ];
     ///
     ///     let result = client.batch_publish_urls(urls, NotificationType::UrlUpdated).await?;
@@ -725,7 +679,7 @@ impl GoogleIndexingClient {
     ///         PathBuf::from("/path/to/service-account.json")
     ///     ).await?;
     ///
-    ///     let metadata = client.get_metadata("https://example.com/page1").await?;
+    ///     let metadata = client.get_metadata("https://placeholder.test/page1").await?;
     ///     println!("Metadata: {:?}", metadata);
     ///     Ok(())
     /// }
@@ -740,11 +694,9 @@ impl GoogleIndexingClient {
         let access_token = self.authenticate().await?;
 
         // Build request URL
-        let encoded_url = percent_encoding::utf8_percent_encode(
-            url,
-            percent_encoding::NON_ALPHANUMERIC,
-        )
-        .to_string();
+        let encoded_url =
+            percent_encoding::utf8_percent_encode(url, percent_encoding::NON_ALPHANUMERIC)
+                .to_string();
         let request_url = format!(
             "{}/urlNotifications/metadata?url={}",
             GOOGLE_INDEXING_API_ENDPOINT, encoded_url
@@ -766,11 +718,12 @@ impl GoogleIndexingClient {
         match status_code {
             StatusCode::OK => {
                 let metadata: MetadataResponse =
-                    response.json().await.map_err(|e| {
-                        IndexerError::JsonDeserializationError {
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| IndexerError::JsonDeserializationError {
                             message: e.to_string(),
-                        }
-                    })?;
+                        })?;
                 debug!("Successfully retrieved metadata for URL: {}", url);
                 Ok(metadata)
             }
@@ -819,6 +772,73 @@ impl GoogleIndexingClient {
             metadata_rate_limit_per_minute: DEFAULT_METADATA_RATE_LIMIT_PER_MINUTE,
         })
     }
+
+    /// Get list of sites from Google Search Console
+    ///
+    /// # Returns
+    ///
+    /// Returns a list of sites the authenticated user/service account has access to
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Authentication fails
+    /// - The HTTP request fails
+    /// - The API returns an error response
+    pub async fn list_search_console_sites(&self) -> Result<Vec<SiteEntry>, IndexerError> {
+        info!("Fetching Search Console sites list");
+
+        // Get access token with Search Console scope
+        let access_token = self
+            .get_access_token_for_scope(GOOGLE_SEARCH_CONSOLE_SCOPE)
+            .await?;
+
+        // Build request URL
+        let request_url = format!("{}/sites", GOOGLE_SEARCH_CONSOLE_API_ENDPOINT);
+
+        // Make request
+        let response = self
+            .client
+            .get(&request_url)
+            .header("Authorization", format!("Bearer {}", access_token))
+            .send()
+            .await
+            .map_err(|e| IndexerError::HttpRequestFailed {
+                message: e.to_string(),
+            })?;
+
+        let status_code = response.status();
+
+        match status_code {
+            StatusCode::OK => {
+                let sites_list: SitesListResponse =
+                    response
+                        .json()
+                        .await
+                        .map_err(|e| IndexerError::JsonDeserializationError {
+                            message: e.to_string(),
+                        })?;
+                debug!(
+                    "Successfully retrieved {} sites",
+                    sites_list.site_entry.len()
+                );
+                Ok(sites_list.site_entry)
+            }
+            StatusCode::FORBIDDEN => {
+                let error_text = response.text().await.unwrap_or_default();
+                Err(IndexerError::GooglePermissionDenied {
+                    message: format!("Cannot access Search Console API. Make sure the service account has Search Console permissions. Error: {}", error_text),
+                })
+            }
+            _ => {
+                let error_text = response.text().await.unwrap_or_default();
+                Err(IndexerError::GoogleApiError {
+                    status_code: status_code.as_u16(),
+                    message: error_text,
+                })
+            }
+        }
+    }
 }
 
 /// Quota information
@@ -834,32 +854,45 @@ pub struct QuotaInfo {
     pub metadata_rate_limit_per_minute: usize,
 }
 
+/// Search Console site entry
+#[derive(Debug, Clone, Deserialize)]
+pub struct SiteEntry {
+    /// Site URL
+    #[serde(rename = "siteUrl")]
+    pub site_url: String,
+    /// Permission level
+    #[serde(rename = "permissionLevel")]
+    pub permission_level: String,
+}
+
+/// Search Console sites list response
+#[derive(Debug, Clone, Deserialize)]
+pub struct SitesListResponse {
+    /// List of sites
+    #[serde(rename = "siteEntry", default)]
+    pub site_entry: Vec<SiteEntry>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_notification_type_display() {
-        assert_eq!(
-            NotificationType::UrlUpdated.to_string(),
-            "URL_UPDATED"
-        );
-        assert_eq!(
-            NotificationType::UrlDeleted.to_string(),
-            "URL_DELETED"
-        );
+        assert_eq!(NotificationType::UrlUpdated.to_string(), "URL_UPDATED");
+        assert_eq!(NotificationType::UrlDeleted.to_string(), "URL_DELETED");
     }
 
     #[test]
     fn test_notification_type_serialization() {
         let notification = UrlNotification {
-            url: "https://example.com/page1".to_string(),
+            url: "https://placeholder.test/page1".to_string(),
             notification_type: NotificationType::UrlUpdated.to_string(),
         };
 
         let json = serde_json::to_string(&notification).unwrap();
         assert!(json.contains("URL_UPDATED"));
-        assert!(json.contains("https://example.com/page1"));
+        assert!(json.contains("https://placeholder.test/page1"));
     }
 
     #[tokio::test]

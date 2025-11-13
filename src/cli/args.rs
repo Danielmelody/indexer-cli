@@ -3,7 +3,7 @@
 //! This module defines the complete CLI structure for the indexer-cli tool,
 //! including all commands, subcommands, and their associated arguments and options.
 
-use clap::{Parser, Subcommand, Args, ValueEnum};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
 /// Indexer CLI - A tool for submitting URLs to Google Indexing API and IndexNow
@@ -147,12 +147,6 @@ pub struct GoogleArgs {
 
 #[derive(Subcommand, Debug, Clone)]
 pub enum GoogleCommand {
-    /// Authenticate with Google using OAuth 2.0
-    Auth(GoogleAuthArgs),
-
-    /// Logout and revoke Google OAuth credentials
-    Logout,
-
     /// Setup Google service account (legacy method)
     Setup(GoogleSetupArgs),
 
@@ -167,21 +161,6 @@ pub enum GoogleCommand {
 
     /// Verify Google API configuration
     Verify,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct GoogleAuthArgs {
-    /// Custom OAuth client ID (optional)
-    #[arg(long)]
-    pub client_id: Option<String>,
-
-    /// Custom OAuth client secret (optional)
-    #[arg(long)]
-    pub client_secret: Option<String>,
-
-    /// Force re-authentication even if already authenticated
-    #[arg(short, long)]
-    pub force: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -236,6 +215,10 @@ pub struct GoogleSubmitArgs {
     /// Skip history check (submit even if already submitted)
     #[arg(long)]
     pub skip_history: bool,
+
+    /// Force submission and ignore database time limits
+    #[arg(short = 'F', long)]
+    pub force: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -362,6 +345,10 @@ pub struct IndexNowSubmitArgs {
     /// Skip history check (submit even if already submitted)
     #[arg(long)]
     pub skip_history: bool,
+
+    /// Force submission and ignore database time limits
+    #[arg(short = 'F', long)]
+    pub force: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -426,6 +413,10 @@ pub struct SubmitArgs {
     /// Skip history check (submit even if already submitted)
     #[arg(long)]
     pub skip_history: bool,
+
+    /// Force submission and ignore database time limits
+    #[arg(short = 'F', long)]
+    pub force: bool,
 
     /// Output format for results
     #[arg(short = 'o', long, default_value = "text")]

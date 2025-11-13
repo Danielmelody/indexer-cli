@@ -19,16 +19,16 @@
 //!
 //! ```bash
 //! # Watch sitemap with default 1-hour interval
-//! indexer-cli watch --sitemap https://example.com/sitemap.xml
+//! indexer-cli watch --sitemap https://placeholder.test/sitemap.xml
 //!
 //! # Custom interval (5 minutes)
-//! indexer-cli watch -s https://example.com/sitemap.xml -i 300
+//! indexer-cli watch -s https://placeholder.test/sitemap.xml -i 300
 //!
 //! # Use only IndexNow API
-//! indexer-cli watch -s https://example.com/sitemap.xml -a indexnow
+//! indexer-cli watch -s https://placeholder.test/sitemap.xml -a indexnow
 //!
 //! # Run in daemon mode
-//! indexer-cli watch -s https://example.com/sitemap.xml -d
+//! indexer-cli watch -s https://placeholder.test/sitemap.xml -d
 //! ```
 
 use crate::api::google_indexing::{GoogleIndexingClient, NotificationType};
@@ -59,10 +59,7 @@ struct SitemapState {
 impl SitemapState {
     /// Create sitemap state from a list of URLs
     fn from_urls(urls: Vec<SitemapUrl>) -> Self {
-        let url_map = urls
-            .into_iter()
-            .map(|u| (u.loc, u.lastmod))
-            .collect();
+        let url_map = urls.into_iter().map(|u| (u.loc, u.lastmod)).collect();
 
         Self {
             urls: url_map,
@@ -120,7 +117,11 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
     if !cli.quiet {
         println!("{}", "Starting sitemap watcher...".cyan().bold());
         println!("  Sitemap: {}", args.sitemap);
-        println!("  Interval: {}s ({})", args.interval, format_duration(args.interval));
+        println!(
+            "  Interval: {}s ({})",
+            args.interval,
+            format_duration(args.interval)
+        );
         println!("  APIs: {:?}", args.api);
         if args.daemon {
             println!("  Mode: daemon (background)");
@@ -147,9 +148,11 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
         println!("\n{}", "Received shutdown signal, stopping...".yellow());
         r.store(false, Ordering::SeqCst);
     })
-    .map_err(|e| crate::types::error::IndexerError::ConfigValidationError {
-        message: format!("Failed to set up signal handler: {}", e),
-    })?;
+    .map_err(
+        |e| crate::types::error::IndexerError::ConfigValidationError {
+            message: format!("Failed to set up signal handler: {}", e),
+        },
+    )?;
 
     // Initialize API clients based on configuration
     let google_client = if should_use_google(&args.api, &config) {
@@ -158,9 +161,13 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
                 if !cli.quiet {
                     println!("{}", "Initializing Google Indexing API...".cyan());
                 }
-                let service_account_path = google_config.service_account_file.clone()
-                    .ok_or_else(|| crate::types::error::IndexerError::ConfigMissingField {
-                        field: "google.service_account_file".to_string(),
+                let service_account_path =
+                    google_config.service_account_path().ok_or_else(|| {
+                        crate::types::error::IndexerError::ConfigMissingField {
+                            field:
+                                "google.auth.service_account_file (or google.service_account_file)"
+                                    .to_string(),
+                        }
                     })?;
                 match GoogleIndexingClient::from_service_account(service_account_path).await {
                     Ok(client) => {
@@ -170,21 +177,14 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
                         Some(Arc::new(client))
                     }
                     Err(e) => {
-                        eprintln!(
-                            "  {} Failed to initialize Google client: {}",
-                            "✗".red(),
-                            e
-                        );
+                        eprintln!("  {} Failed to initialize Google client: {}", "✗".red(), e);
                         return Err(e);
                     }
                 }
             }
             _ => {
                 if !cli.quiet {
-                    println!(
-                        "  {} Google API not configured, skipping",
-                        "!".yellow()
-                    );
+                    println!("  {} Google API not configured, skipping", "!".yellow());
                 }
                 None
             }
@@ -231,10 +231,7 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
             }
             _ => {
                 if !cli.quiet {
-                    println!(
-                        "  {} IndexNow API not configured, skipping",
-                        "!".yellow()
-                    );
+                    println!("  {} IndexNow API not configured, skipping", "!".yellow());
                 }
                 None
             }
@@ -252,8 +249,8 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
     }
 
     // Initialize database and history manager
-    let db_path = Path::new(&config.history.database_path);
-    let db_conn = init_database(db_path)?;
+    let db_path = crate::config::expand_tilde(&config.history.database_path);
+    let db_conn = init_database(&db_path)?;
     let history = Arc::new(HistoryManager::new(db_conn));
 
     // Configure batch submitter with history checking enabled
@@ -261,12 +258,7 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
         .with_check_history(true)
         .with_progress_bar(!cli.quiet);
 
-    let submitter = BatchSubmitter::new(
-        google_client,
-        indexnow_client,
-        history,
-        batch_config,
-    );
+    let submitter = BatchSubmitter::new(google_client, indexnow_client, history, batch_config);
 
     // Parse initial sitemap state
     if !cli.quiet {
@@ -287,7 +279,9 @@ pub async fn run(args: WatchArgs, cli: &Cli) -> Result<()> {
         println!();
         println!(
             "{}",
-            "Watching for changes... (Press Ctrl+C to stop)".green().bold()
+            "Watching for changes... (Press Ctrl+C to stop)"
+                .green()
+                .bold()
         );
         println!();
     }
@@ -407,17 +401,13 @@ fn should_use_google(api_target: &ApiTarget, config: &crate::config::Settings) -
     let requested = matches!(api_target, ApiTarget::Google | ApiTarget::All);
 
     // Check if Google config exists and is enabled
-    let enabled = config
-        .google
-        .as_ref()
-        .map(|g| g.enabled)
-        .unwrap_or(false);
+    let enabled = config.google.as_ref().map(|g| g.enabled).unwrap_or(false);
 
     // Check if service account is configured
     let configured = config
         .google
         .as_ref()
-        .and_then(|g| g.service_account_file.as_ref())
+        .and_then(|g| g.service_account_path())
         .map(|p| !p.as_os_str().is_empty())
         .unwrap_or(false);
 
@@ -430,11 +420,7 @@ fn should_use_indexnow(api_target: &ApiTarget, config: &crate::config::Settings)
     let requested = matches!(api_target, ApiTarget::IndexNow | ApiTarget::All);
 
     // Check if IndexNow config exists and is enabled
-    let enabled = config
-        .indexnow
-        .as_ref()
-        .map(|i| i.enabled)
-        .unwrap_or(false);
+    let enabled = config.indexnow.as_ref().map(|i| i.enabled).unwrap_or(false);
 
     // Check if API key is configured
     let configured = config
@@ -478,7 +464,7 @@ mod tests {
         let base_time = Utc::now();
 
         let old_urls = vec![SitemapUrl {
-            loc: "https://example.com/page1".to_string(),
+            loc: "https://placeholder.test/page1".to_string(),
             lastmod: Some(base_time),
             changefreq: None,
             priority: None,
@@ -486,13 +472,13 @@ mod tests {
 
         let new_urls = vec![
             SitemapUrl {
-                loc: "https://example.com/page1".to_string(),
+                loc: "https://placeholder.test/page1".to_string(),
                 lastmod: Some(base_time),
                 changefreq: None,
                 priority: None,
             },
             SitemapUrl {
-                loc: "https://example.com/page2".to_string(),
+                loc: "https://placeholder.test/page2".to_string(),
                 lastmod: None,
                 changefreq: None,
                 priority: None,
@@ -504,7 +490,7 @@ mod tests {
 
         let changes = old_state.find_changes(&new_state);
         assert_eq!(changes.len(), 1);
-        assert!(changes.contains(&"https://example.com/page2".to_string()));
+        assert!(changes.contains(&"https://placeholder.test/page2".to_string()));
     }
 
     #[test]
@@ -515,14 +501,14 @@ mod tests {
         let later_time = base_time.add(chrono::Duration::hours(1));
 
         let old_urls = vec![SitemapUrl {
-            loc: "https://example.com/page1".to_string(),
+            loc: "https://placeholder.test/page1".to_string(),
             lastmod: Some(base_time),
             changefreq: None,
             priority: None,
         }];
 
         let new_urls = vec![SitemapUrl {
-            loc: "https://example.com/page1".to_string(),
+            loc: "https://placeholder.test/page1".to_string(),
             lastmod: Some(later_time),
             changefreq: None,
             priority: None,
@@ -533,7 +519,7 @@ mod tests {
 
         let changes = old_state.find_changes(&new_state);
         assert_eq!(changes.len(), 1);
-        assert!(changes.contains(&"https://example.com/page1".to_string()));
+        assert!(changes.contains(&"https://placeholder.test/page1".to_string()));
     }
 
     #[test]
@@ -541,14 +527,14 @@ mod tests {
         let base_time = Utc::now();
 
         let old_urls = vec![SitemapUrl {
-            loc: "https://example.com/page1".to_string(),
+            loc: "https://placeholder.test/page1".to_string(),
             lastmod: Some(base_time),
             changefreq: None,
             priority: None,
         }];
 
         let new_urls = vec![SitemapUrl {
-            loc: "https://example.com/page1".to_string(),
+            loc: "https://placeholder.test/page1".to_string(),
             lastmod: Some(base_time),
             changefreq: None,
             priority: None,
@@ -576,13 +562,13 @@ mod tests {
     fn test_sitemap_state_url_count() {
         let urls = vec![
             SitemapUrl {
-                loc: "https://example.com/page1".to_string(),
+                loc: "https://placeholder.test/page1".to_string(),
                 lastmod: None,
                 changefreq: None,
                 priority: None,
             },
             SitemapUrl {
-                loc: "https://example.com/page2".to_string(),
+                loc: "https://placeholder.test/page2".to_string(),
                 lastmod: None,
                 changefreq: None,
                 priority: None,

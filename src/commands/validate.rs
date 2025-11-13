@@ -5,11 +5,14 @@
 
 use crate::api::google_indexing::GoogleIndexingClient;
 use crate::api::indexnow::IndexNowClient;
-use crate::cli::args::{Cli, OutputFormat, ValidateArgs};
-use crate::config::{expand_tilde, load_config, validate_config};
-use crate::types::Result;
+use crate::cli::args::{Cli, OutputFormat, ValidateArgs, ValidateTarget};
+use crate::config::settings::IndexNowConfig;
+use crate::config::validation::{build_validation_report, ValidationOptions};
+use crate::config::{expand_tilde, load_config};
+use crate::types::{IndexerError, Result};
 use chrono::Utc;
 use colored::Colorize;
+use url::Url;
 
 /// Run the validate command.
 pub async fn run(args: ValidateArgs, cli: &Cli) -> Result<()> {
@@ -23,8 +26,16 @@ pub async fn run(args: ValidateArgs, cli: &Cli) -> Result<()> {
     // Load configuration
     let config = load_config()?;
 
-    // Run basic validation
-    let mut report = validate_config(&config)?;
+    // Determine validation scope
+    let target = args.target.clone().unwrap_or(ValidateTarget::All);
+    let validation_options = match target {
+        ValidateTarget::All => ValidationOptions::all(),
+        ValidateTarget::Google => ValidationOptions::google_only(),
+        ValidateTarget::IndexNow => ValidationOptions::indexnow_only(),
+    };
+
+    // Run scoped validation
+    let mut report = build_validation_report(&config, &validation_options)?;
 
     // Additional checks if requested
     if args.check_connectivity {
@@ -32,8 +43,25 @@ pub async fn run(args: ValidateArgs, cli: &Cli) -> Result<()> {
             println!("{}", "Checking connectivity...".cyan());
         }
 
-        let connectivity_results = check_connectivity(&config).await?;
+        let connectivity_results = check_connectivity(&config, target.clone()).await?;
         report.info.extend(connectivity_results);
+    }
+
+    if args.check_key_file {
+        if let Some(indexnow_config) = config.indexnow.as_ref().filter(|cfg| cfg.enabled) {
+            match verify_indexnow_key_file(indexnow_config).await {
+                Ok(_) => report.add_success(
+                    "IndexNow key file is accessible and matches the configured API key",
+                ),
+                Err(e) => {
+                    report.add_error(&format!("IndexNow key file verification failed: {}", e))
+                }
+            }
+        } else {
+            report.add_error(
+                "IndexNow key file check requested but IndexNow is not configured or is disabled",
+            );
+        }
     }
 
     if args.check_files {
@@ -80,20 +108,29 @@ pub async fn run(args: ValidateArgs, cli: &Cli) -> Result<()> {
 }
 
 /// Check connectivity to configured APIs
-async fn check_connectivity(config: &crate::config::Settings) -> Result<Vec<String>> {
+async fn check_connectivity(
+    config: &crate::config::Settings,
+    target: ValidateTarget,
+) -> Result<Vec<String>> {
     let mut results = Vec::new();
+    let check_google = matches!(target, ValidateTarget::All | ValidateTarget::Google);
+    let check_indexnow = matches!(target, ValidateTarget::All | ValidateTarget::IndexNow);
 
     // Test Google API if configured
-    if let Some(google_config) = &config.google {
-        if google_config.enabled {
-            if let Some(service_account_path) = &google_config.service_account_file {
-                match GoogleIndexingClient::from_service_account(service_account_path.clone()).await {
-                    Ok(_client) => {
-                        // Successfully created client (which validates and authenticates)
-                        results.push("✓ Google API authentication successful".to_string());
-                    }
-                    Err(e) => {
-                        results.push(format!("✗ Google API connection failed: {}", e));
+    if check_google {
+        if let Some(google_config) = &config.google {
+            if google_config.enabled {
+                if let Some(service_account_path) = &google_config.service_account_file {
+                    match GoogleIndexingClient::from_service_account(service_account_path.clone())
+                        .await
+                    {
+                        Ok(_client) => {
+                            // Successfully created client (which validates and authenticates)
+                            results.push("✓ Google API authentication successful".to_string());
+                        }
+                        Err(e) => {
+                            results.push(format!("✗ Google API connection failed: {}", e));
+                        }
                     }
                 }
             }
@@ -101,21 +138,23 @@ async fn check_connectivity(config: &crate::config::Settings) -> Result<Vec<Stri
     }
 
     // Test IndexNow API if configured
-    if let Some(indexnow_config) = &config.indexnow {
-        if indexnow_config.enabled {
-            match IndexNowClient::new(
-                indexnow_config.api_key.clone(),
-                indexnow_config.key_location.clone(),
-                indexnow_config.endpoints.clone(),
-            ) {
-                Ok(_client) => {
-                    results.push(format!(
-                        "✓ IndexNow client initialized ({} endpoints configured)",
-                        indexnow_config.endpoints.len()
-                    ));
-                }
-                Err(e) => {
-                    results.push(format!("✗ IndexNow client error: {}", e));
+    if check_indexnow {
+        if let Some(indexnow_config) = &config.indexnow {
+            if indexnow_config.enabled {
+                match IndexNowClient::new(
+                    indexnow_config.api_key.clone(),
+                    indexnow_config.key_location.clone(),
+                    indexnow_config.endpoints.clone(),
+                ) {
+                    Ok(_client) => {
+                        results.push(format!(
+                            "✓ IndexNow client initialized ({} endpoints configured)",
+                            indexnow_config.endpoints.len()
+                        ));
+                    }
+                    Err(e) => {
+                        results.push(format!("✗ IndexNow client error: {}", e));
+                    }
                 }
             }
         }
@@ -133,7 +172,10 @@ fn check_referenced_files(config: &crate::config::Settings) -> Result<Vec<String
         if google_config.enabled {
             if let Some(path) = &google_config.service_account_file {
                 if path.exists() {
-                    results.push(format!("✓ Google service account file exists: {}", path.display()));
+                    results.push(format!(
+                        "✓ Google service account file exists: {}",
+                        path.display()
+                    ));
                 } else {
                     results.push(format!(
                         "✗ Google service account file not found: {}",
@@ -166,10 +208,7 @@ fn check_referenced_files(config: &crate::config::Settings) -> Result<Vec<String
     let log_path = expand_tilde(&config.logging.file);
     if let Some(parent) = log_path.parent() {
         if parent.exists() {
-            results.push(format!(
-                "✓ Log directory exists: {}",
-                parent.display()
-            ));
+            results.push(format!("✓ Log directory exists: {}", parent.display()));
         } else {
             results.push(format!(
                 "⚠ Log directory does not exist (will be created): {}",
@@ -226,10 +265,7 @@ fn check_file_permissions(config: &crate::config::Settings) -> Result<Vec<String
     let db_path = expand_tilde(&config.history.database_path);
     if db_path.exists() {
         let _metadata = std::fs::metadata(&db_path)?;
-        results.push(format!(
-            "✓ Database file accessible: {}",
-            db_path.display()
-        ));
+        results.push(format!("✓ Database file accessible: {}", db_path.display()));
     } else if let Some(parent) = db_path.parent() {
         if parent.exists() {
             let metadata = std::fs::metadata(parent)?;
@@ -324,4 +360,22 @@ mod tests {
     fn test_validate_module() {
         assert!(true);
     }
+}
+
+async fn verify_indexnow_key_file(config: &IndexNowConfig) -> Result<()> {
+    let client = IndexNowClient::new(
+        config.api_key.clone(),
+        config.key_location.clone(),
+        config.endpoints.clone(),
+    )?;
+
+    let url = Url::parse(&config.key_location).map_err(|_| IndexerError::InvalidUrl {
+        url: config.key_location.clone(),
+    })?;
+
+    let host = url.host_str().ok_or_else(|| IndexerError::InvalidUrl {
+        url: config.key_location.clone(),
+    })?;
+
+    client.verify_key_file(host).await
 }

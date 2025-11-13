@@ -361,8 +361,10 @@ pub fn get_submissions_stats(conn: &Connection) -> Result<SubmissionStats, Index
         last_submission,
     };
 
-    debug!("Submission statistics: total={}, success={}, failed={}, google={}, indexnow={}",
-           stats.total, stats.success, stats.failed, stats.google, stats.indexnow);
+    debug!(
+        "Submission statistics: total={}, success={}, failed={}, google={}, indexnow={}",
+        stats.total, stats.success, stats.failed, stats.google, stats.indexnow
+    );
 
     Ok(stats)
 }
@@ -455,10 +457,7 @@ pub fn count_submissions(
 ) -> Result<i64, IndexerError> {
     let (where_clause, params) = filters.build_where_clause();
 
-    let query = format!(
-        "SELECT COUNT(*) FROM submission_history {}",
-        where_clause
-    );
+    let query = format!("SELECT COUNT(*) FROM submission_history {}", where_clause);
 
     let mut stmt = conn
         .prepare(&query)
@@ -496,7 +495,7 @@ mod tests {
         let conn = setup_test_db();
 
         let record = SubmissionRecord::builder()
-            .url("https://example.com/page1")
+            .url("https://placeholder.test/page1")
             .api(ApiType::Google)
             .action(ActionType::UrlUpdated)
             .status(SubmissionStatus::Success)
@@ -507,9 +506,10 @@ mod tests {
         let id = insert_submission(&conn, &record).unwrap();
         assert!(id > 0);
 
-        let retrieved = get_submission_by_url(&conn, "https://example.com/page1", ApiType::Google)
-            .unwrap()
-            .unwrap();
+        let retrieved =
+            get_submission_by_url(&conn, "https://placeholder.test/page1", ApiType::Google)
+                .unwrap()
+                .unwrap();
 
         assert_eq!(retrieved.url, record.url);
         assert_eq!(retrieved.api, record.api);
@@ -523,7 +523,7 @@ mod tests {
         // Insert test records
         for i in 1..=5 {
             let record = SubmissionRecord::builder()
-                .url(format!("https://example.com/page{}", i))
+                .url(format!("https://placeholder.test/page{}", i))
                 .api(if i % 2 == 0 {
                     ApiType::Google
                 } else {
@@ -563,7 +563,7 @@ mod tests {
         // Insert test records
         for i in 1..=10 {
             let record = SubmissionRecord::builder()
-                .url(format!("https://example.com/page{}", i))
+                .url(format!("https://placeholder.test/page{}", i))
                 .api(if i <= 6 {
                     ApiType::Google
                 } else {
@@ -594,7 +594,7 @@ mod tests {
         let conn = setup_test_db();
 
         let record = SubmissionRecord::builder()
-            .url("https://example.com/test")
+            .url("https://placeholder.test/test")
             .api(ApiType::Google)
             .action(ActionType::UrlUpdated)
             .status(SubmissionStatus::Success)
@@ -605,21 +605,35 @@ mod tests {
 
         // Check within time window
         let since = Utc::now() - Duration::hours(1);
-        let exists = check_url_submitted(&conn, "https://example.com/test", ApiType::Google, since)
-            .unwrap();
+        let exists = check_url_submitted(
+            &conn,
+            "https://placeholder.test/test",
+            ApiType::Google,
+            since,
+        )
+        .unwrap();
         assert!(exists);
 
         // Check outside time window
         let since = Utc::now() + Duration::hours(1);
-        let exists = check_url_submitted(&conn, "https://example.com/test", ApiType::Google, since)
-            .unwrap();
+        let exists = check_url_submitted(
+            &conn,
+            "https://placeholder.test/test",
+            ApiType::Google,
+            since,
+        )
+        .unwrap();
         assert!(!exists);
 
         // Check different API
         let since = Utc::now() - Duration::hours(1);
-        let exists =
-            check_url_submitted(&conn, "https://example.com/test", ApiType::IndexNow, since)
-                .unwrap();
+        let exists = check_url_submitted(
+            &conn,
+            "https://placeholder.test/test",
+            ApiType::IndexNow,
+            since,
+        )
+        .unwrap();
         assert!(!exists);
     }
 
@@ -630,7 +644,7 @@ mod tests {
         // Insert records
         for i in 1..=5 {
             let record = SubmissionRecord::builder()
-                .url(format!("https://example.com/page{}", i))
+                .url(format!("https://placeholder.test/page{}", i))
                 .api(ApiType::Google)
                 .action(ActionType::UrlUpdated)
                 .status(SubmissionStatus::Success)
@@ -654,7 +668,7 @@ mod tests {
         // Insert test records
         for i in 1..=10 {
             let record = SubmissionRecord::builder()
-                .url(format!("https://example.com/page{}", i))
+                .url(format!("https://placeholder.test/page{}", i))
                 .api(ApiType::Google)
                 .action(ActionType::UrlUpdated)
                 .status(SubmissionStatus::Success)

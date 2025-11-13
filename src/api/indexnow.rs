@@ -19,20 +19,20 @@
 //! // Create client with API key
 //! let client = IndexNowClient::new(
 //!     "your-api-key".to_string(),
-//!     "https://example.com/your-api-key.txt".to_string(),
+//!     "https://placeholder.test/your-api-key.txt".to_string(),
 //!     vec!["https://api.indexnow.org/indexnow".to_string()],
 //! )?;
 //!
 //! // Submit single URL
 //! let response = client.submit_url(
-//!     "https://example.com/page1",
+//!     "https://placeholder.test/page1",
 //!     "https://api.indexnow.org/indexnow"
 //! ).await?;
 //!
 //! // Submit multiple URLs
 //! let urls = vec![
-//!     "https://example.com/page1".to_string(),
-//!     "https://example.com/page2".to_string(),
+//!     "https://placeholder.test/page1".to_string(),
+//!     "https://placeholder.test/page2".to_string(),
 //! ];
 //! let response = client.submit_urls(&urls, "https://api.indexnow.org/indexnow").await?;
 //! # Ok(())
@@ -40,8 +40,7 @@
 //! ```
 
 use crate::constants::{
-    INDEXNOW_ENDPOINTS,
-    INDEXNOW_KEY_MAX_LENGTH, INDEXNOW_KEY_MIN_LENGTH,
+    INDEXNOW_ENDPOINTS, INDEXNOW_KEY_MAX_LENGTH, INDEXNOW_KEY_MIN_LENGTH,
     INDEXNOW_MAX_URLS_PER_REQUEST, USER_AGENT,
 };
 use crate::types::error::IndexerError;
@@ -59,7 +58,7 @@ use url::Url;
 /// Request body for IndexNow batch submission
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexNowRequest {
-    /// The host/domain name (e.g., "example.com")
+    /// The host/domain name (e.g., "placeholder.test")
     pub host: String,
 
     /// The API key for authentication
@@ -145,7 +144,7 @@ impl IndexNowClient {
     /// # Arguments
     ///
     /// * `api_key` - The IndexNow API key (8-128 characters, alphanumeric)
-    /// * `key_location` - Full URL to the key file (e.g., "https://example.com/key.txt")
+    /// * `key_location` - Full URL to the key file (e.g., "https://placeholder.test/key.txt")
     /// * `endpoints` - List of IndexNow endpoints to use
     ///
     /// # Errors
@@ -161,7 +160,7 @@ impl IndexNowClient {
     /// # use indexer_cli::api::indexnow::IndexNowClient;
     /// let client = IndexNowClient::new(
     ///     "your-32-character-api-key".to_string(),
-    ///     "https://example.com/your-32-character-api-key.txt".to_string(),
+    ///     "https://placeholder.test/your-32-character-api-key.txt".to_string(),
     ///     vec!["https://api.indexnow.org/indexnow".to_string()],
     /// )?;
     /// # Ok::<(), indexer_cli::types::error::IndexerError>(())
@@ -211,10 +210,7 @@ impl IndexNowClient {
         api_key: String,
         key_location: String,
     ) -> Result<Self, IndexerError> {
-        let endpoints = INDEXNOW_ENDPOINTS
-            .iter()
-            .map(|&s| s.to_string())
-            .collect();
+        let endpoints = INDEXNOW_ENDPOINTS.iter().map(|&s| s.to_string()).collect();
         Self::new(api_key, key_location, endpoints)
     }
 
@@ -295,24 +291,21 @@ impl IndexNowClient {
         };
 
         let client = &self.client;
-        let response = retry_with_backoff(
-            retry_config,
-            || async {
-                client
-                    .get(&request_url)
-                    .send()
-                    .await
-                    .map_err(|e| IndexerError::HttpRequestFailed {
-                        message: e.to_string(),
-                    })
-            },
-        )
+        let response = retry_with_backoff(retry_config, || async {
+            client
+                .get(&request_url)
+                .send()
+                .await
+                .map_err(|e| IndexerError::HttpRequestFailed {
+                    message: e.to_string(),
+                })
+        })
         .await?;
 
         let status = response.status();
         let status_code = status.as_u16();
 
-        debug!("IndexNow response status: {}", status_code);
+        info!("IndexNow response from {}: HTTP {}", endpoint, status_code);
 
         // Handle response based on status code
         match status_code {
@@ -333,36 +326,57 @@ impl IndexNowClient {
                 ))
             }
             400 => {
-                let body = response.text().await.map_err(|e| {
-                    IndexerError::HttpRequestFailed {
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
                         message: format!("Failed to read response body: {}", e),
-                    }
-                })?;
+                    })?;
                 Err(IndexerError::IndexNowBadRequest {
                     message: format!("Invalid request format: {}", body),
                 })
             }
-            403 => Err(IndexerError::IndexNowInvalidKey),
-            422 => {
-                let body = response.text().await.map_err(|e| {
-                    IndexerError::HttpRequestFailed {
+            403 => {
+                // Check if it's a verification pending error or invalid key
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
                         message: format!("Failed to read response body: {}", e),
-                    }
-                })?;
+                    })?;
+
+                // Check if it's "UserForbiddedToAccessSite" which means verification pending
+                if body.contains("UserForbiddedToAccessSite") || body.contains("verify the site using the key") {
+                    info!("Key verification pending - this is normal for first-time submissions");
+                    Ok(IndexNowResponse::new(
+                        202, // Treat as pending verification
+                        "Submitted, key verification pending. Bing/IndexNow will verify your key file automatically within 24-48 hours.".to_string(),
+                        endpoint.to_string(),
+                    ))
+                } else {
+                    Err(IndexerError::IndexNowInvalidKey)
+                }
+            }
+            422 => {
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    })?;
                 Err(IndexerError::IndexNowUnprocessableEntity {
-                    message: format!(
-                        "URL does not belong to host or key mismatch: {}",
-                        body
-                    ),
+                    message: format!("URL does not belong to host or key mismatch: {}", body),
                 })
             }
             429 => Err(IndexerError::IndexNowRateLimitExceeded),
             _ => {
-                let body = response.text().await.map_err(|e| {
-                    IndexerError::HttpRequestFailed {
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
                         message: format!("Failed to read response body: {}", e),
-                    }
-                })?;
+                    })?;
+                info!("Response body: {}", body);
                 Err(IndexerError::IndexNowApiError {
                     status_code,
                     message: body,
@@ -433,7 +447,19 @@ impl IndexNowClient {
             url_list: urls.to_vec(),
         };
 
-        debug!("IndexNow POST request to: {}", endpoint);
+        // Log the request details
+        info!("IndexNow POST request to: {}", endpoint);
+        info!("Request body:");
+        info!("  - host: {}", request_body.host);
+        info!("  - key: {}", request_body.key);
+        info!("  - keyLocation: {}", request_body.key_location);
+        info!("  - urlList: {} URLs", request_body.url_list.len());
+        debug!("  - URLs: {:?}", request_body.url_list);
+
+        // Log full JSON request body at debug level
+        if let Ok(json_body) = serde_json::to_string_pretty(&request_body) {
+            debug!("Full JSON request body:\n{}", json_body);
+        }
 
         // Execute request with retry
         let retry_config = RetryConfig {
@@ -445,25 +471,22 @@ impl IndexNowClient {
         };
 
         let client = &self.client;
-        let response = retry_with_backoff(
-            retry_config,
-            || async {
-                client
-                    .post(endpoint)
-                    .json(&request_body)
-                    .send()
-                    .await
-                    .map_err(|e| IndexerError::HttpRequestFailed {
-                        message: e.to_string(),
-                    })
-            },
-        )
+        let response = retry_with_backoff(retry_config, || async {
+            client
+                .post(endpoint)
+                .json(&request_body)
+                .send()
+                .await
+                .map_err(|e| IndexerError::HttpRequestFailed {
+                    message: e.to_string(),
+                })
+        })
         .await?;
 
         let status = response.status();
         let status_code = status.as_u16();
 
-        debug!("IndexNow response status: {}", status_code);
+        info!("IndexNow response from {}: HTTP {}", endpoint, status_code);
 
         // Handle response based on status code
         match status_code {
@@ -482,44 +505,65 @@ impl IndexNowClient {
                 );
                 Ok(IndexNowResponse::new(
                     status_code,
-                    format!(
-                        "{} URLs accepted, key verification in progress",
-                        urls.len()
-                    ),
+                    format!("{} URLs accepted, key verification in progress", urls.len()),
                     endpoint.to_string(),
                 ))
             }
             400 => {
-                let body = response.text().await.map_err(|e| {
-                    IndexerError::HttpRequestFailed {
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
                         message: format!("Failed to read response body: {}", e),
-                    }
-                })?;
+                    })?;
+                info!("Response body: {}", body);
                 Err(IndexerError::IndexNowBadRequest {
                     message: format!("Invalid request format: {}", body),
                 })
             }
-            403 => Err(IndexerError::IndexNowInvalidKey),
-            422 => {
-                let body = response.text().await.map_err(|e| {
-                    IndexerError::HttpRequestFailed {
+            403 => {
+                // Check if it's a verification pending error or invalid key
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
                         message: format!("Failed to read response body: {}", e),
-                    }
-                })?;
+                    })?;
+                info!("Response body: {}", body);
+
+                // Check if it's "UserForbiddedToAccessSite" which means verification pending
+                if body.contains("UserForbiddedToAccessSite") || body.contains("verify the site using the key") {
+                    info!("Key verification pending - this is normal for first-time submissions");
+                    Ok(IndexNowResponse::new(
+                        202, // Treat as pending verification
+                        "Submitted, key verification pending. Bing/IndexNow will verify your key file automatically within 24-48 hours.".to_string(),
+                        endpoint.to_string(),
+                    ))
+                } else {
+                    Err(IndexerError::IndexNowInvalidKey)
+                }
+            }
+            422 => {
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
+                        message: format!("Failed to read response body: {}", e),
+                    })?;
+                info!("Response body: {}", body);
                 Err(IndexerError::IndexNowUnprocessableEntity {
-                    message: format!(
-                        "URLs do not belong to host or key mismatch: {}",
-                        body
-                    ),
+                    message: format!("URLs do not belong to host or key mismatch: {}", body),
                 })
             }
             429 => Err(IndexerError::IndexNowRateLimitExceeded),
             _ => {
-                let body = response.text().await.map_err(|e| {
-                    IndexerError::HttpRequestFailed {
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| IndexerError::HttpRequestFailed {
                         message: format!("Failed to read response body: {}", e),
-                    }
-                })?;
+                    })?;
+                info!("Response body: {}", body);
                 Err(IndexerError::IndexNowApiError {
                     status_code,
                     message: body,
@@ -601,7 +645,7 @@ impl IndexNowClient {
     ///
     /// # Arguments
     ///
-    /// * `host` - The host/domain to check (e.g., "example.com")
+    /// * `host` - The host/domain to check (e.g., "placeholder.test")
     ///
     /// # Errors
     ///
@@ -611,37 +655,52 @@ impl IndexNowClient {
     pub async fn verify_key_file(&self, host: &str) -> Result<(), IndexerError> {
         info!("Verifying IndexNow key file for host: {}", host);
 
-        // Build key file URL
-        let key_file_url = format!("https://{}/{}.txt", host, self.api_key);
+        // Parse key_location and ensure it matches the target host
+        let key_location_url =
+            Url::parse(&self.key_location).map_err(|e| IndexerError::InvalidUrl {
+                url: format!("Invalid key_location URL: {}", e),
+            })?;
 
+        let key_host = key_location_url
+            .host_str()
+            .ok_or_else(|| IndexerError::InvalidUrl {
+                url: format!("Key location missing host component: {}", self.key_location),
+            })?;
+
+        if !key_host.eq_ignore_ascii_case(host) {
+            return Err(IndexerError::IndexNowKeyLocationMismatch {
+                expected_host: host.to_string(),
+                actual_host: key_host.to_string(),
+            });
+        }
+
+        let key_file_url = key_location_url.to_string();
         debug!("Checking key file at: {}", key_file_url);
 
         // Fetch key file
-        let response = self
-            .client
-            .get(&key_file_url)
-            .send()
-            .await
-            .map_err(|e| IndexerError::IndexNowKeyFileNotAccessible {
+        let response = self.client.get(&key_file_url).send().await.map_err(|e| {
+            IndexerError::IndexNowKeyFileNotAccessible {
                 url: key_file_url.clone(),
                 message: e.to_string(),
-            })?;
+            }
+        })?;
 
         if !response.status().is_success() {
             return Err(IndexerError::IndexNowKeyFileNotAccessible {
-                url: key_file_url,
+                url: key_file_url.clone(),
                 message: format!("HTTP {}", response.status()),
             });
         }
 
         // Read content
-        let content = response
-            .text()
-            .await
-            .map_err(|e| IndexerError::IndexNowKeyFileNotAccessible {
-                url: key_file_url.clone(),
-                message: format!("Failed to read response: {}", e),
-            })?;
+        let content =
+            response
+                .text()
+                .await
+                .map_err(|e| IndexerError::IndexNowKeyFileNotAccessible {
+                    url: key_file_url.clone(),
+                    message: format!("Failed to read response: {}", e),
+                })?;
 
         // Verify content matches API key
         let content = content.trim();
@@ -796,7 +855,7 @@ mod tests {
     async fn test_create_client() {
         let result = IndexNowClient::new(
             "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6".to_string(),
-            "https://example.com/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6.txt".to_string(),
+            "https://placeholder.test/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6.txt".to_string(),
             vec!["https://api.indexnow.org/indexnow".to_string()],
         );
         assert!(result.is_ok());
@@ -804,7 +863,7 @@ mod tests {
         // Invalid key
         let result = IndexNowClient::new(
             "short".to_string(),
-            "https://example.com/key.txt".to_string(),
+            "https://placeholder.test/key.txt".to_string(),
             vec!["https://api.indexnow.org/indexnow".to_string()],
         );
         assert!(result.is_err());
@@ -820,7 +879,7 @@ mod tests {
         // Empty endpoints
         let result = IndexNowClient::new(
             "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6".to_string(),
-            "https://example.com/key.txt".to_string(),
+            "https://placeholder.test/key.txt".to_string(),
             vec![],
         );
         assert!(result.is_err());
@@ -830,7 +889,7 @@ mod tests {
     async fn test_with_default_endpoints() {
         let result = IndexNowClient::with_default_endpoints(
             "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6".to_string(),
-            "https://example.com/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6.txt".to_string(),
+            "https://placeholder.test/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6.txt".to_string(),
         );
         assert!(result.is_ok());
 

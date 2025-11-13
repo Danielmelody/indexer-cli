@@ -7,19 +7,8 @@ google:
 
   # Authentication settings
   auth:
-    # Method: 'oauth' or 'service_account'
-    method: oauth
-
-    # OAuth 2.0 credentials (for method: oauth)
-    # IMPORTANT: Never commit these to version control!
-    # Consider using environment variables instead:
-    #   GOOGLE_OAUTH_CLIENT_ID
-    #   GOOGLE_OAUTH_CLIENT_SECRET
-    oauth_client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com"
-    oauth_client_secret: "YOUR_CLIENT_SECRET"
-
-    # Service account file (for method: service_account)
-    # service_account_file: "/path/to/service-account.json"
+    # Path to the Google Cloud service account JSON key
+    service_account_file: "/path/to/service-account.json"
 
   # API quota settings
   quota:
@@ -45,6 +34,7 @@ indexnow:
     - "https://api.indexnow.org/indexnow"
     - "https://www.bing.com/indexnow"
     - "https://yandex.com/indexnow"
+    - "https://www.duckduckgo.com/indexnow"
 
   # Batch size for bulk submissions
   batch_size: 10000

@@ -16,4 +16,6 @@ pub use settings::{
     RetryConfig, Settings, SitemapConfig, SitemapFilters,
 };
 
-pub use validation::{validate_config, validate_google_config, validate_indexnow_config, ValidationReport};
+pub use validation::{
+    validate_config, validate_google_config, validate_indexnow_config, ValidationReport,
+};

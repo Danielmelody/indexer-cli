@@ -17,8 +17,7 @@ pub async fn run(args: InitArgs, _cli: &Cli) -> Result<()> {
 
     // Check for existing configuration
     let config_path = if args.global {
-        get_global_config_path()
-            .context("Failed to determine global configuration path")?
+        get_global_config_path().context("Failed to determine global configuration path")?
     } else {
         PathBuf::from("indexer.yaml")
     };
@@ -27,7 +26,8 @@ pub async fn run(args: InitArgs, _cli: &Cli) -> Result<()> {
         return Err(anyhow::anyhow!(
             "Configuration file already exists at: {}\nUse --force to overwrite",
             config_path.display()
-        ).into());
+        )
+        .into());
     }
 
     let settings = if args.non_interactive {
@@ -40,11 +40,9 @@ pub async fn run(args: InitArgs, _cli: &Cli) -> Result<()> {
 
     // Save configuration
     let saved_path = if args.global {
-        save_global_config(&settings)
-            .context("Failed to save global configuration")?
+        save_global_config(&settings).context("Failed to save global configuration")?
     } else {
-        save_project_config(&settings)
-            .context("Failed to save project configuration")?
+        save_project_config(&settings).context("Failed to save project configuration")?
     };
 
     // Success message
@@ -55,11 +53,28 @@ pub async fn run(args: InitArgs, _cli: &Cli) -> Result<()> {
 
 fn print_welcome() {
     println!();
-    println!("{}", "╔════════════════════════════════════════════════════╗".cyan());
-    println!("{}", "║                                                    ║".cyan());
-    println!("{}", "║            Welcome to indexer-cli!                 ║".cyan().bold());
-    println!("{}", "║                                                    ║".cyan());
-    println!("{}", "╚════════════════════════════════════════════════════╝".cyan());
+    println!(
+        "{}",
+        "╔════════════════════════════════════════════════════╗".cyan()
+    );
+    println!(
+        "{}",
+        "║                                                    ║".cyan()
+    );
+    println!(
+        "{}",
+        "║            Welcome to indexer-cli!                 ║"
+            .cyan()
+            .bold()
+    );
+    println!(
+        "{}",
+        "║                                                    ║".cyan()
+    );
+    println!(
+        "{}",
+        "╚════════════════════════════════════════════════════╝".cyan()
+    );
     println!();
     println!("This wizard will help you set up your configuration.");
     println!();
@@ -88,7 +103,10 @@ fn run_interactive_wizard(args: &InitArgs) -> Result<Settings> {
 
         if scope == 1 {
             // This is a bit hacky, but we'll handle it at the save stage
-            println!("{}", "Note: Use --global flag next time for global config".dimmed());
+            println!(
+                "{}",
+                "Note: Use --global flag next time for global config".dimmed()
+            );
         }
         println!();
     }
@@ -154,8 +172,14 @@ fn run_interactive_wizard(args: &InitArgs) -> Result<Settings> {
 }
 
 fn configure_google(theme: &ColorfulTheme) -> Result<GoogleConfig> {
-    println!("{}", "  Google Indexing API requires a service account JSON file.".dimmed());
-    println!("{}", "  Learn more: https://developers.google.com/search/apis/indexing-api/v3/quickstart".dimmed());
+    println!(
+        "{}",
+        "  Google Indexing API requires a service account JSON file.".dimmed()
+    );
+    println!(
+        "{}",
+        "  Run 'indexer-cli google setup' for step-by-step guide".dimmed()
+    );
     println!();
 
     let service_account_path: String = Input::with_theme(theme)
@@ -189,9 +213,6 @@ fn configure_google(theme: &ColorfulTheme) -> Result<GoogleConfig> {
     Ok(GoogleConfig {
         enabled: true,
         auth: crate::config::settings::GoogleAuthConfig {
-            method: crate::config::settings::GoogleAuthMethod::ServiceAccount,
-            oauth_client_id: None,
-            oauth_client_secret: None,
             service_account_file: Some(PathBuf::from(&service_account_path)),
         },
         service_account_file: Some(PathBuf::from(service_account_path)),
@@ -201,8 +222,14 @@ fn configure_google(theme: &ColorfulTheme) -> Result<GoogleConfig> {
 }
 
 fn configure_indexnow(theme: &ColorfulTheme) -> Result<IndexNowConfig> {
-    println!("{}", "  IndexNow API requires an API key (8-128 characters).".dimmed());
-    println!("{}", "  You can generate one with: indexer indexnow generate-key".dimmed());
+    println!(
+        "{}",
+        "  IndexNow API requires an API key (8-128 characters).".dimmed()
+    );
+    println!(
+        "{}",
+        "  You can generate one with: indexer indexnow generate-key".dimmed()
+    );
     println!();
 
     let has_key = Confirm::with_theme(theme)
@@ -232,7 +259,7 @@ fn configure_indexnow(theme: &ColorfulTheme) -> Result<IndexNowConfig> {
     };
 
     let key_location: String = Input::with_theme(theme)
-        .with_prompt("Key file location URL (e.g., https://example.com/YOUR_KEY.txt)")
+        .with_prompt("Key file location URL (e.g., https://placeholder.test/YOUR_KEY.txt)")
         .validate_with(|input: &String| -> std::result::Result<(), &str> {
             if input.starts_with("http://") || input.starts_with("https://") {
                 Ok(())
@@ -245,8 +272,17 @@ fn configure_indexnow(theme: &ColorfulTheme) -> Result<IndexNowConfig> {
 
     if !has_key {
         println!();
-        println!("{}", "  Important: Remember to upload the key file!".yellow().bold());
-        println!("  Create a file named {}.txt with content: {}", api_key.bright_cyan(), api_key.bright_cyan());
+        println!(
+            "{}",
+            "  Important: Remember to upload the key file!"
+                .yellow()
+                .bold()
+        );
+        println!(
+            "  Create a file named {}.txt with content: {}",
+            api_key.bright_cyan(),
+            api_key.bright_cyan()
+        );
         println!("  Upload it to: {}", key_location.bright_cyan());
         println!();
     }
@@ -318,7 +354,11 @@ fn configure_history(theme: &ColorfulTheme) -> Result<HistoryConfig> {
 
     let database_path: String = Input::with_theme(theme)
         .with_prompt("History database path")
-        .default("~/.indexer-cli/history.db".to_string())
+        .default(
+            crate::constants::default_database_file_path()
+                .to_string_lossy()
+                .to_string(),
+        )
         .interact_text()
         .map_err(|e| anyhow::anyhow!("Failed to get user input: {}", e))?;
 
@@ -354,7 +394,11 @@ fn configure_logging(theme: &ColorfulTheme) -> Result<LoggingConfig> {
 
     let log_file: String = Input::with_theme(theme)
         .with_prompt("Log file path")
-        .default("~/.indexer-cli/indexer.log".to_string())
+        .default(
+            crate::constants::default_log_file_path()
+                .to_string_lossy()
+                .to_string(),
+        )
         .interact_text()
         .map_err(|e| anyhow::anyhow!("Failed to get user input: {}", e))?;
 
@@ -411,13 +455,34 @@ fn generate_indexnow_key(length: usize) -> String {
 
 fn print_success(config_path: &Path, settings: &Settings) {
     println!();
-    println!("{}", "╔════════════════════════════════════════════════════╗".green());
-    println!("{}", "║                                                    ║".green());
-    println!("{}", "║          Configuration Created Successfully!       ║".green().bold());
-    println!("{}", "║                                                    ║".green());
-    println!("{}", "╚════════════════════════════════════════════════════╝".green());
+    println!(
+        "{}",
+        "╔════════════════════════════════════════════════════╗".green()
+    );
+    println!(
+        "{}",
+        "║                                                    ║".green()
+    );
+    println!(
+        "{}",
+        "║          Configuration Created Successfully!       ║"
+            .green()
+            .bold()
+    );
+    println!(
+        "{}",
+        "║                                                    ║".green()
+    );
+    println!(
+        "{}",
+        "╚════════════════════════════════════════════════════╝".green()
+    );
     println!();
-    println!("{} {}", "Configuration saved to:".bold(), config_path.display().to_string().cyan());
+    println!(
+        "{} {}",
+        "Configuration saved to:".bold(),
+        config_path.display().to_string().cyan()
+    );
     println!();
 
     // Show what was configured
@@ -444,13 +509,19 @@ fn print_success(config_path: &Path, settings: &Settings) {
     }
 
     if settings.indexnow.is_some() {
-        println!("  {}. Upload your IndexNow key file:", if settings.google.is_some() { "2" } else { "1" });
+        println!(
+            "  {}. Upload your IndexNow key file:",
+            if settings.google.is_some() { "2" } else { "1" }
+        );
         if let Some(ref indexnow) = settings.indexnow {
             println!("     Key: {}", indexnow.api_key.bright_cyan());
             println!("     Location: {}", indexnow.key_location.bright_cyan());
         }
         println!();
-        println!("  {}. Verify IndexNow setup:", if settings.google.is_some() { "3" } else { "2" });
+        println!(
+            "  {}. Verify IndexNow setup:",
+            if settings.google.is_some() { "3" } else { "2" }
+        );
         println!("     {}", "indexer indexnow verify".bright_white());
         println!();
     }
@@ -462,8 +533,15 @@ fn print_success(config_path: &Path, settings: &Settings) {
     };
 
     println!("  {}. Start submitting URLs:", next_num);
-    println!("     {}", "indexer submit --sitemap https://example.com/sitemap.xml".bright_white());
-    println!("     {}", "indexer submit https://example.com/page1 https://example.com/page2".bright_white());
+    println!(
+        "     {}",
+        "indexer submit --sitemap https://placeholder.test/sitemap.xml".bright_white()
+    );
+    println!(
+        "     {}",
+        "indexer submit https://placeholder.test/page1 https://placeholder.test/page2"
+            .bright_white()
+    );
     println!();
 
     println!("{}", "For more information, run: indexer --help".dimmed());

@@ -45,7 +45,7 @@
                     "!".yellow().bold()
                 );
                 eprintln!(
-                    "  {} Run 'indexer-cli google auth' to set up OAuth authentication",
+                    "  {} Run 'indexer-cli google setup --service-account <path-to-key.json>' to configure the Google service account",
                     "→".cyan()
                 );
                 eprintln!(
@@ -59,9 +59,9 @@
                     "  {} Google Indexing API not configured (will only use IndexNow)",
                     "ℹ".blue()
                 );
-                println!(
-                    "    Run 'indexer-cli google auth' to enable Google Search indexing",
-                );
+                    println!(
+                        "    Run 'indexer-cli google setup --service-account <path-to-key.json>' to enable Google Search indexing",
+                    );
                 println!();
             }
             _ => {}
@@ -156,20 +156,20 @@ $ cargo build
 
 **命令**:
 ```bash
-indexer-cli submit --sitemap https://test-ipv6.run/sitemap.xml --api all --skip-history
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml --api all --skip-history
 ```
 
 **输出**:
 ```
 Collecting URLs...
-  → Parsing sitemap: https://test-ipv6.run/sitemap.xml
- INFO Parsing sitemap from URL: https://test-ipv6.run/sitemap.xml
+  → Parsing sitemap: https://your-site.com/sitemap.xml
+ INFO Parsing sitemap from URL: https://your-site.com/sitemap.xml
  INFO Extracted 117 unique URLs from sitemap
     Found 117 URLs in sitemap
   ✓ Total URLs to process: 117
 
   ℹ Google Indexing API not configured (will only use IndexNow)
-    Run 'indexer-cli google auth' to enable Google Search indexing
+    Run 'indexer-cli google setup --service-account <path-to-key.json>' to enable Google Search indexing
 
 Initializing IndexNow API...
   ✓ IndexNow API client ready
@@ -187,21 +187,21 @@ Initializing IndexNow API...
 
 **命令**:
 ```bash
-indexer-cli submit --sitemap https://test-ipv6.run/sitemap.xml --api google --skip-history
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml --api google --skip-history
 ```
 
 **输出**:
 ```
 Collecting URLs...
-  → Parsing sitemap: https://test-ipv6.run/sitemap.xml
- INFO Parsing sitemap from URL: https://test-ipv6.run/sitemap.xml
+  → Parsing sitemap: https://your-site.com/sitemap.xml
+ INFO Parsing sitemap from URL: https://your-site.com/sitemap.xml
  INFO Extracted 117 unique URLs from sitemap
     Found 117 URLs in sitemap
   ✓ Total URLs to process: 117
 
 
   ! Google Indexing API is not configured
-  → Run 'indexer-cli google auth' to set up OAuth authentication
+  → Run 'indexer-cli google setup --service-account <path-to-key.json>' to configure the service account
   → Or use '--api index-now' to only use IndexNow API
 
 
@@ -211,7 +211,7 @@ Error: Configuration validation failed: No APIs configured. Run 'indexer init' t
 **分析**:
 - ✅ 显示黄色粗体 ! 警告图标
 - ✅ 提供两个解决方案:
-  1. 运行 `indexer-cli google auth` 配置 Google
+  1. 运行 `indexer-cli google setup --service-account <path-to-key.json>` 配置 Google
   2. 使用 `--api index-now` 改用 IndexNow
 - ✅ 输出到 stderr (错误流)
 - ✅ 程序退出并报错 (因为用户明确要求的 API 不可用)
@@ -222,14 +222,14 @@ Error: Configuration validation failed: No APIs configured. Run 'indexer init' t
 
 **命令**:
 ```bash
-indexer-cli submit --sitemap https://test-ipv6.run/sitemap.xml --api index-now --skip-history
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml --api index-now --skip-history
 ```
 
 **输出**:
 ```
 Collecting URLs...
-  → Parsing sitemap: https://test-ipv6.run/sitemap.xml
- INFO Parsing sitemap from URL: https://test-ipv6.run/sitemap.xml
+  → Parsing sitemap: https://your-site.com/sitemap.xml
+ INFO Parsing sitemap from URL: https://your-site.com/sitemap.xml
  INFO Extracted 117 unique URLs from sitemap
     Found 117 URLs in sitemap
   ✓ Total URLs to process: 117
@@ -329,7 +329,7 @@ Error: No APIs configured
 **新版输出**:
 ```
   ℹ Google Indexing API not configured (will only use IndexNow)
-    Run 'indexer-cli google auth' to enable Google Search indexing
+    Run 'indexer-cli google setup --service-account <path-to-key.json>' to enable Google Search indexing
 
   ℹ IndexNow API not configured (will only use Google)
     Run 'indexer-cli indexnow setup' to enable IndexNow
@@ -358,7 +358,7 @@ indexer-cli submit --sitemap https://example.com/sitemap.xml
 **新版输出**:
 ```
   ℹ Google Indexing API not configured (will only use IndexNow)
-    Run 'indexer-cli google auth' to enable Google Search indexing
+    Run 'indexer-cli google setup --service-account <path-to-key.json>' to enable Google Search indexing
 
 Initializing IndexNow API...
   ✓ IndexNow API client ready
@@ -386,7 +386,7 @@ Error: No APIs configured
 **新版输出**:
 ```
   ! Google Indexing API is not configured
-  → Run 'indexer-cli google auth' to set up OAuth authentication
+  → Run 'indexer-cli google setup --service-account <path-to-key.json>' to configure the service account
   → Or use '--api index-now' to only use IndexNow API
 
 Error: No APIs configured. Run 'indexer init' to set up API credentials

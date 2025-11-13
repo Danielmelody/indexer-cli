@@ -2,8 +2,8 @@
 
 use crate::api::indexnow::IndexNowClient;
 use crate::cli::args::{
-    Cli, IndexNowArgs, IndexNowCommand, IndexNowEndpoint, IndexNowGenerateKeyArgs,
-    IndexNowSetupArgs, IndexNowSubmitArgs, SubmitArgs, ApiTarget, OutputFormat,
+    ApiTarget, Cli, IndexNowArgs, IndexNowCommand, IndexNowEndpoint, IndexNowGenerateKeyArgs,
+    IndexNowSetupArgs, IndexNowSubmitArgs, OutputFormat, SubmitArgs,
 };
 use crate::config::loader::{load_config, save_global_config, save_project_config};
 use crate::config::settings::IndexNowConfig;
@@ -12,7 +12,6 @@ use crate::types::Result;
 use crate::utils::file::write_file_sync;
 use colored::Colorize;
 use dialoguer::Input;
-
 
 pub async fn run(args: IndexNowArgs, cli: &Cli) -> Result<()> {
     match args.command {
@@ -42,7 +41,10 @@ pub async fn setup(args: IndexNowSetupArgs, _cli: &Cli) -> Result<()> {
         });
     }
 
-    if !api_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+    if !api_key
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
         return Err(IndexerError::InvalidApiKey {
             message: "API key must contain only alphanumeric characters and hyphens".to_string(),
         });
@@ -56,7 +58,7 @@ pub async fn setup(args: IndexNowSetupArgs, _cli: &Cli) -> Result<()> {
         location
     } else {
         Input::new()
-            .with_prompt("Key file location URL (e.g., https://example.com/your-key.txt)")
+            .with_prompt("Key file location URL (e.g., https://placeholder.test/your-key.txt)")
             .interact()
             .map_err(|e| IndexerError::InternalError {
                 message: format!("Failed to read input: {}", e),
@@ -99,7 +101,10 @@ pub async fn setup(args: IndexNowSetupArgs, _cli: &Cli) -> Result<()> {
     println!();
 
     // Test connectivity
-    println!("{}", "Testing connectivity to IndexNow endpoints...".dimmed());
+    println!(
+        "{}",
+        "Testing connectivity to IndexNow endpoints...".dimmed()
+    );
     println!();
 
     let client = IndexNowClient::new(
@@ -145,11 +150,16 @@ pub async fn setup(args: IndexNowSetupArgs, _cli: &Cli) -> Result<()> {
 
     println!();
     if all_ok {
-        println!("{}", "✓ Setup complete! IndexNow is ready to use.".green().bold());
+        println!(
+            "{}",
+            "✓ Setup complete! IndexNow is ready to use.".green().bold()
+        );
     } else {
         println!(
             "{}",
-            "⚠ Setup complete but some endpoints failed. Check the errors above.".yellow().bold()
+            "⚠ Setup complete but some endpoints failed. Check the errors above."
+                .yellow()
+                .bold()
         );
     }
     println!();
@@ -193,14 +203,17 @@ pub async fn generate_key(args: IndexNowGenerateKeyArgs, _cli: &Cli) -> Result<(
         let key_file_path = output_dir.join(format!("{}.txt", api_key));
         write_file_sync(&key_file_path, &api_key)?;
         println!("{}", "✓ Key file saved!".green());
-        println!("  Location: {}", key_file_path.display().to_string().dimmed());
+        println!(
+            "  Location: {}",
+            key_file_path.display().to_string().dimmed()
+        );
         println!();
     }
 
     // Save to configuration if requested
     if args.save {
         let key_location: String = Input::new()
-            .with_prompt("Key file location URL (e.g., https://example.com/your-key.txt)")
+            .with_prompt("Key file location URL (e.g., https://placeholder.test/your-key.txt)")
             .interact()
             .map_err(|e| IndexerError::InternalError {
                 message: format!("Failed to read input: {}", e),
@@ -271,6 +284,7 @@ pub async fn submit(args: IndexNowSubmitArgs, cli: &Cli) -> Result<()> {
         batch_size: args.batch_size,
         dry_run: args.dry_run,
         skip_history: args.skip_history,
+        force: args.force,
         format: OutputFormat::Text,
     };
 
@@ -316,17 +330,21 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
 
     println!();
     println!("Configuration Details:");
-    println!("  API Key: {}...{}",
+    println!(
+        "  API Key: {}...{}",
         &indexnow_config.api_key[..8.min(indexnow_config.api_key.len())],
         if indexnow_config.api_key.len() > 16 {
-            &indexnow_config.api_key[indexnow_config.api_key.len()-8..]
+            &indexnow_config.api_key[indexnow_config.api_key.len() - 8..]
         } else {
             ""
         }
     );
     println!("  Key Length: {} characters", indexnow_config.api_key.len());
     println!("  Key Location: {}", indexnow_config.key_location);
-    println!("  Endpoints: {} configured", indexnow_config.endpoints.len());
+    println!(
+        "  Endpoints: {} configured",
+        indexnow_config.endpoints.len()
+    );
     println!("  Batch Size: {}", indexnow_config.batch_size);
 
     // Validate key format
@@ -334,7 +352,11 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
     print!("{}", "Validating API key format... ".dimmed());
     if indexnow_config.api_key.len() >= 8
         && indexnow_config.api_key.len() <= 128
-        && indexnow_config.api_key.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') {
+        && indexnow_config
+            .api_key
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
         println!("{}", "✓".green());
     } else {
         println!("{}", "✗".red());
@@ -371,14 +393,23 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
         Err(e) => {
             println!("  {} Key file verification failed: {}", "✗".red(), e);
             println!();
-            println!("{}", "⚠ Key file is not accessible or doesn't match the API key".yellow());
-            println!("  Make sure to upload the key file to: {}", indexnow_config.key_location);
+            println!(
+                "{}",
+                "⚠ Key file is not accessible or doesn't match the API key".yellow()
+            );
+            println!(
+                "  Make sure to upload the key file to: {}",
+                indexnow_config.key_location
+            );
         }
     }
 
     // Test connectivity to endpoints
     println!();
-    println!("{}", "Testing connectivity to IndexNow endpoints...".dimmed());
+    println!(
+        "{}",
+        "Testing connectivity to IndexNow endpoints...".dimmed()
+    );
     println!();
 
     let test_url = format!("https://{}/", host);
@@ -412,7 +443,11 @@ pub async fn verify(_cli: &Cli) -> Result<()> {
 
     println!();
     println!("Summary:");
-    println!("  Successful endpoints: {}/{}", successful_endpoints, results.len());
+    println!(
+        "  Successful endpoints: {}/{}",
+        successful_endpoints,
+        results.len()
+    );
 
     if all_ok {
         println!();

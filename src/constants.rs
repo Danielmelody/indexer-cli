@@ -40,8 +40,7 @@ pub const GOOGLE_INDEXING_API_ENDPOINT: &str = "https://indexing.googleapis.com/
 /// Google Indexing API batch endpoint
 ///
 /// Used for batch requests to the Google Indexing API.
-pub const GOOGLE_INDEXING_API_BATCH_ENDPOINT: &str =
-    "https://indexing.googleapis.com/batch/v3";
+pub const GOOGLE_INDEXING_API_BATCH_ENDPOINT: &str = "https://indexing.googleapis.com/batch/v3";
 
 /// IndexNow API endpoint (api.indexnow.org)
 ///
@@ -58,11 +57,17 @@ pub const INDEXNOW_BING_ENDPOINT: &str = "https://www.bing.com/indexnow";
 /// Direct endpoint for submitting URLs to Yandex via IndexNow protocol.
 pub const INDEXNOW_YANDEX_ENDPOINT: &str = "https://yandex.com/indexnow";
 
+/// IndexNow DuckDuckGo endpoint
+///
+/// Direct endpoint for submitting URLs to DuckDuckGo via IndexNow protocol.
+pub const INDEXNOW_DUCKDUCKGO_ENDPOINT: &str = "https://www.duckduckgo.com/indexnow";
+
 /// List of all supported IndexNow endpoints
 pub const INDEXNOW_ENDPOINTS: &[&str] = &[
     INDEXNOW_API_ENDPOINT,
     INDEXNOW_BING_ENDPOINT,
     INDEXNOW_YANDEX_ENDPOINT,
+    INDEXNOW_DUCKDUCKGO_ENDPOINT,
 ];
 
 // =============================================================================
@@ -133,26 +138,11 @@ pub const DEFAULT_CONFIG_DIR_NAME: &str = ".indexer-cli";
 /// Default configuration file name
 pub const DEFAULT_CONFIG_FILE_NAME: &str = "config.yaml";
 
-/// Default configuration file path relative to home directory
-///
-/// Full path: `~/.indexer-cli/config.yaml`
-pub const DEFAULT_CONFIG_FILE_PATH: &str = "~/.indexer-cli/config.yaml";
-
 /// Default database file name
 pub const DEFAULT_DATABASE_FILE_NAME: &str = "history.db";
 
-/// Default database file path relative to home directory
-///
-/// Full path: `~/.indexer-cli/history.db`
-pub const DEFAULT_DATABASE_FILE_PATH: &str = "~/.indexer-cli/history.db";
-
 /// Default log file name
 pub const DEFAULT_LOG_FILE_NAME: &str = "indexer.log";
-
-/// Default log file path relative to home directory
-///
-/// Full path: `~/.indexer-cli/indexer.log`
-pub const DEFAULT_LOG_FILE_PATH: &str = "~/.indexer-cli/indexer.log";
 
 /// Default Google service account credentials file name
 pub const DEFAULT_GOOGLE_CREDENTIALS_FILE_NAME: &str = "service-account.json";
@@ -234,7 +224,8 @@ pub const INDEXNOW_KEY_RECOMMENDED_LENGTH: usize = 32;
 /// Valid characters for IndexNow API key
 ///
 /// Keys should contain only alphanumeric characters and hyphens.
-pub const INDEXNOW_KEY_VALID_CHARS: &str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
+pub const INDEXNOW_KEY_VALID_CHARS: &str =
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
 
 // =============================================================================
 // Rate Limiting
@@ -330,16 +321,19 @@ pub const MAX_CACHE_ENTRIES: usize = 10_000;
 // =============================================================================
 
 /// Error message for missing configuration
-pub const ERROR_CONFIG_NOT_FOUND: &str = "Configuration file not found. Run 'indexer-cli init' to create one.";
+pub const ERROR_CONFIG_NOT_FOUND: &str =
+    "Configuration file not found. Run 'indexer-cli init' to create one.";
 
 /// Error message for invalid configuration
 pub const ERROR_CONFIG_INVALID: &str = "Configuration file is invalid. Please check the format.";
 
 /// Error message for missing Google credentials
-pub const ERROR_GOOGLE_CREDENTIALS_NOT_FOUND: &str = "Google service account credentials not found. Please configure your credentials.";
+pub const ERROR_GOOGLE_CREDENTIALS_NOT_FOUND: &str =
+    "Google service account credentials not found. Please configure your credentials.";
 
 /// Error message for missing IndexNow key
-pub const ERROR_INDEXNOW_KEY_NOT_FOUND: &str = "IndexNow API key not found. Please configure your API key.";
+pub const ERROR_INDEXNOW_KEY_NOT_FOUND: &str =
+    "IndexNow API key not found. Please configure your API key.";
 
 // =============================================================================
 // Success Messages
@@ -437,13 +431,19 @@ mod tests {
     #[test]
     fn test_path_helpers() {
         let config_dir = default_config_dir();
-        assert!(config_dir.to_string_lossy().contains(DEFAULT_CONFIG_DIR_NAME));
+        assert!(config_dir
+            .to_string_lossy()
+            .contains(DEFAULT_CONFIG_DIR_NAME));
 
         let config_path = default_config_file_path();
-        assert!(config_path.to_string_lossy().ends_with(DEFAULT_CONFIG_FILE_NAME));
+        assert!(config_path
+            .to_string_lossy()
+            .ends_with(DEFAULT_CONFIG_FILE_NAME));
 
         let db_path = default_database_file_path();
-        assert!(db_path.to_string_lossy().ends_with(DEFAULT_DATABASE_FILE_NAME));
+        assert!(db_path
+            .to_string_lossy()
+            .ends_with(DEFAULT_DATABASE_FILE_NAME));
 
         let log_path = default_log_file_path();
         assert!(log_path.to_string_lossy().ends_with(DEFAULT_LOG_FILE_NAME));

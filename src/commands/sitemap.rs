@@ -90,7 +90,10 @@ async fn handle_parse(args: SitemapParseArgs, cli: &Cli) -> Result<()> {
                 if !cli.quiet {
                     println!("{:4}. {}", i + 1, url.loc);
                     if let Some(lastmod) = &url.lastmod {
-                        println!("      Last Modified: {}", lastmod.format("%Y-%m-%d %H:%M:%S UTC"));
+                        println!(
+                            "      Last Modified: {}",
+                            lastmod.format("%Y-%m-%d %H:%M:%S UTC")
+                        );
                     }
                     if let Some(changefreq) = &url.changefreq {
                         println!("      Change Frequency: {}", changefreq);
@@ -109,9 +112,7 @@ async fn handle_parse(args: SitemapParseArgs, cli: &Cli) -> Result<()> {
                 println!(
                     "{},{},{},{}",
                     url.loc,
-                    url.lastmod
-                        .map(|dt| dt.to_rfc3339())
-                        .unwrap_or_default(),
+                    url.lastmod.map(|dt| dt.to_rfc3339()).unwrap_or_default(),
                     url.changefreq.as_deref().unwrap_or(""),
                     url.priority.map(|p| p.to_string()).unwrap_or_default()
                 );
@@ -444,11 +445,9 @@ fn export_urls(
     // Create parent directories if they don't exist
     if let Some(parent) = output_path.parent() {
         if !parent.exists() {
-            std::fs::create_dir_all(parent).map_err(|e| {
-                IndexerError::DirectoryCreationFailed {
-                    path: parent.to_path_buf(),
-                    message: e.to_string(),
-                }
+            std::fs::create_dir_all(parent).map_err(|e| IndexerError::DirectoryCreationFailed {
+                path: parent.to_path_buf(),
+                message: e.to_string(),
             })?;
         }
     }
@@ -497,9 +496,7 @@ fn export_urls(
                     file,
                     "{},{},{},{}",
                     url.loc,
-                    url.lastmod
-                        .map(|dt| dt.to_rfc3339())
-                        .unwrap_or_default(),
+                    url.lastmod.map(|dt| dt.to_rfc3339()).unwrap_or_default(),
                     url.changefreq.as_deref().unwrap_or(""),
                     url.priority.map(|p| p.to_string()).unwrap_or_default()
                 )

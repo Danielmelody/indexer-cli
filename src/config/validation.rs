@@ -6,52 +6,111 @@ use anyhow::{Context, Result};
 use std::fs;
 use std::path::Path;
 
+/// Controls which parts of the configuration should be validated.
+#[derive(Debug, Clone, Copy)]
+pub struct ValidationOptions {
+    pub validate_google: bool,
+    pub validate_indexnow: bool,
+    pub validate_common: bool,
+}
+
+impl ValidationOptions {
+    /// Validate all sections (default behavior).
+    pub fn all() -> Self {
+        Self {
+            validate_google: true,
+            validate_indexnow: true,
+            validate_common: true,
+        }
+    }
+
+    /// Validate only Google related settings.
+    pub fn google_only() -> Self {
+        Self {
+            validate_google: true,
+            validate_indexnow: false,
+            validate_common: false,
+        }
+    }
+
+    /// Validate only IndexNow related settings.
+    pub fn indexnow_only() -> Self {
+        Self {
+            validate_google: false,
+            validate_indexnow: true,
+            validate_common: false,
+        }
+    }
+}
+
+impl Default for ValidationOptions {
+    fn default() -> Self {
+        Self::all()
+    }
+}
+
 /// Validate the entire configuration
 pub fn validate_config(settings: &Settings) -> Result<ValidationReport> {
-    let mut report = ValidationReport::new();
-
-    // Validate Google config if present
-    if let Some(ref google_config) = settings.google {
-        if google_config.enabled {
-            match validate_google_config(google_config) {
-                Ok(_) => report.add_success("Google Indexing API configuration is valid"),
-                Err(e) => report.add_error(&format!("Google Indexing API: {}", e)),
-            }
-        } else {
-            report.add_info("Google Indexing API is disabled");
-        }
-    } else {
-        report.add_warning("Google Indexing API is not configured");
-    }
-
-    // Validate IndexNow config if present
-    if let Some(ref indexnow_config) = settings.indexnow {
-        if indexnow_config.enabled {
-            match validate_indexnow_config(indexnow_config) {
-                Ok(_) => report.add_success("IndexNow API configuration is valid"),
-                Err(e) => report.add_error(&format!("IndexNow API: {}", e)),
-            }
-        } else {
-            report.add_info("IndexNow API is disabled");
-        }
-    } else {
-        report.add_warning("IndexNow API is not configured");
-    }
-
-    // Validate file paths
-    validate_file_paths(settings, &mut report)?;
-
-    // Validate numeric ranges
-    validate_numeric_ranges(settings, &mut report)?;
-
-    // Validate log level
-    validate_log_level(&settings.logging.level, &mut report)?;
-
-    // Validate output format
-    validate_output_format(&settings.output.format, &mut report)?;
+    let report = build_validation_report(settings, &ValidationOptions::default())?;
 
     if report.has_errors() {
         anyhow::bail!("Configuration validation failed:\n{}", report);
+    }
+
+    Ok(report)
+}
+
+/// Build a validation report according to the provided options.
+pub fn build_validation_report(
+    settings: &Settings,
+    options: &ValidationOptions,
+) -> Result<ValidationReport> {
+    let mut report = ValidationReport::new();
+
+    if options.validate_google {
+        // Validate Google config if present
+        if let Some(ref google_config) = settings.google {
+            if google_config.enabled {
+                match validate_google_config(google_config) {
+                    Ok(_) => report.add_success("Google Indexing API configuration is valid"),
+                    Err(e) => report.add_error(&format!("Google Indexing API: {}", e)),
+                }
+            } else {
+                report.add_info("Google Indexing API is disabled");
+            }
+        } else {
+            report.add_warning("Google Indexing API is not configured");
+        }
+    }
+
+    if options.validate_indexnow {
+        // Validate IndexNow config if present
+        if let Some(ref indexnow_config) = settings.indexnow {
+            if indexnow_config.enabled {
+                match validate_indexnow_config(indexnow_config) {
+                    Ok(_) => report.add_success("IndexNow API configuration is valid"),
+                    Err(e) => report.add_error(&format!("IndexNow API: {}", e)),
+                }
+            } else {
+                report.add_info("IndexNow API is disabled");
+            }
+        } else {
+            report.add_warning("IndexNow API is not configured");
+        }
+    }
+
+    if options.validate_common {
+        // Validate file paths
+        validate_file_paths(settings, &mut report)?;
+
+        // Validate numeric ranges
+        validate_numeric_ranges(settings, &mut report)?;
+
+        // Validate log level
+        validate_log_level(&settings.logging.level, &mut report)?;
+
+        // Validate output format
+        validate_output_format(&settings.output.format, &mut report)?;
     }
 
     Ok(report)
@@ -119,8 +178,7 @@ pub fn validate_indexnow_config(config: &IndexNowConfig) -> Result<()> {
         anyhow::bail!("IndexNow key location URL is required");
     }
 
-    validate_url(&config.key_location)
-        .context("Invalid key location URL")?;
+    validate_url(&config.key_location).context("Invalid key location URL")?;
 
     // Validate endpoints
     if config.endpoints.is_empty() {
@@ -128,8 +186,7 @@ pub fn validate_indexnow_config(config: &IndexNowConfig) -> Result<()> {
     }
 
     for endpoint in &config.endpoints {
-        validate_url(endpoint)
-            .with_context(|| format!("Invalid endpoint URL: {}", endpoint))?;
+        validate_url(endpoint).with_context(|| format!("Invalid endpoint URL: {}", endpoint))?;
     }
 
     // Validate batch size
@@ -150,8 +207,8 @@ fn validate_service_account_file<P: AsRef<Path>>(path: P) -> Result<()> {
     let contents = fs::read_to_string(path)
         .with_context(|| format!("Failed to read service account file: {}", path.display()))?;
 
-    let json: serde_json::Value = serde_json::from_str(&contents)
-        .context("Service account file is not valid JSON")?;
+    let json: serde_json::Value =
+        serde_json::from_str(&contents).context("Service account file is not valid JSON")?;
 
     // Check for required fields
     let required_fields = [
@@ -165,10 +222,7 @@ fn validate_service_account_file<P: AsRef<Path>>(path: P) -> Result<()> {
 
     for field in &required_fields {
         if !json.get(field).is_some() {
-            anyhow::bail!(
-                "Service account file is missing required field: {}",
-                field
-            );
+            anyhow::bail!("Service account file is missing required field: {}", field);
         }
     }
 
@@ -263,8 +317,7 @@ fn validate_output_format(format: &str, report: &mut ValidationReport) -> Result
 
 /// Validate a URL
 fn validate_url(url: &str) -> Result<()> {
-    url::Url::parse(url)
-        .with_context(|| format!("Invalid URL: {}", url))?;
+    url::Url::parse(url).with_context(|| format!("Invalid URL: {}", url))?;
     Ok(())
 }
 
@@ -406,5 +459,44 @@ mod tests {
         config.api_key = "invalid-key-with-dashes".to_string();
         config.key_location = "https://example.com/key.txt".to_string();
         assert!(validate_indexnow_config(&config).is_err());
+    }
+
+    #[test]
+    fn test_build_report_google_only_scope() {
+        let mut settings = Settings::default();
+        settings.google = Some(GoogleConfig::default());
+
+        let report = build_validation_report(&settings, &ValidationOptions::google_only()).unwrap();
+
+        assert!(report
+            .successes
+            .iter()
+            .any(|msg| msg.contains("Google Indexing API")));
+        assert!(report
+            .warnings
+            .iter()
+            .all(|msg| !msg.contains("IndexNow API")));
+    }
+
+    #[test]
+    fn test_build_report_indexnow_only_scope() {
+        let mut settings = Settings::default();
+        let mut indexnow = IndexNowConfig::default();
+        indexnow.api_key = "abcd1234".to_string();
+        indexnow.key_location = "https://example.com/abcd1234.txt".to_string();
+        indexnow.endpoints = vec!["https://api.indexnow.org/indexnow".to_string()];
+        settings.indexnow = Some(indexnow);
+
+        let report =
+            build_validation_report(&settings, &ValidationOptions::indexnow_only()).unwrap();
+
+        assert!(report
+            .successes
+            .iter()
+            .any(|msg| msg.contains("IndexNow API")));
+        assert!(report
+            .warnings
+            .iter()
+            .all(|msg| !msg.contains("Google Indexing API")));
     }
 }

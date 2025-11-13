@@ -152,12 +152,27 @@ impl SubmissionRecord {
         Ok(SubmissionRecord {
             id: row.get(0)?,
             url: row.get(1)?,
-            api: ApiType::from_str(&row.get::<_, String>(2)?)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(2, rusqlite::types::Type::Text, Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e))))?,
-            action: ActionType::from_str(&row.get::<_, String>(3)?)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(3, rusqlite::types::Type::Text, Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e))))?,
-            status: SubmissionStatus::from_str(&row.get::<_, String>(4)?)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(4, rusqlite::types::Type::Text, Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e))))?,
+            api: ApiType::from_str(&row.get::<_, String>(2)?).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    2,
+                    rusqlite::types::Type::Text,
+                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+                )
+            })?,
+            action: ActionType::from_str(&row.get::<_, String>(3)?).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    3,
+                    rusqlite::types::Type::Text,
+                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+                )
+            })?,
+            status: SubmissionStatus::from_str(&row.get::<_, String>(4)?).map_err(|e| {
+                rusqlite::Error::FromSqlConversionFailure(
+                    4,
+                    rusqlite::types::Type::Text,
+                    Box::new(std::io::Error::new(std::io::ErrorKind::InvalidData, e)),
+                )
+            })?,
             response_code: row.get(5)?,
             response_message: row.get(6)?,
             submitted_at: row.get(7)?,
@@ -295,7 +310,7 @@ mod tests {
     #[test]
     fn test_submission_record_builder() {
         let record = SubmissionRecord::builder()
-            .url("https://example.com/page")
+            .url("https://placeholder.test/page")
             .api(ApiType::Google)
             .action(ActionType::UrlUpdated)
             .status(SubmissionStatus::Success)
@@ -304,7 +319,7 @@ mod tests {
             .build()
             .unwrap();
 
-        assert_eq!(record.url, "https://example.com/page");
+        assert_eq!(record.url, "https://placeholder.test/page");
         assert_eq!(record.api, ApiType::Google);
         assert_eq!(record.action, ActionType::UrlUpdated);
         assert_eq!(record.status, SubmissionStatus::Success);
@@ -316,7 +331,7 @@ mod tests {
     #[test]
     fn test_submission_record_builder_missing_fields() {
         let result = SubmissionRecord::builder()
-            .url("https://example.com/page")
+            .url("https://placeholder.test/page")
             .build();
         assert!(result.is_err());
     }

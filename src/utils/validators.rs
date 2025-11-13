@@ -37,13 +37,15 @@ pub const INDEXNOW_KEY_MAX_LENGTH: usize = 128;
 /// assert_eq!(url.scheme(), "https");
 /// ```
 pub fn validate_url(url_str: &str) -> Result<Url> {
-    let url = Url::parse(url_str)
-        .with_context(|| format!("Invalid URL: {}", url_str))?;
+    let url = Url::parse(url_str).with_context(|| format!("Invalid URL: {}", url_str))?;
 
     // Ensure the URL has a valid scheme (http or https)
     match url.scheme() {
         "http" | "https" => Ok(url),
-        scheme => bail!("Invalid URL scheme '{}', expected 'http' or 'https'", scheme),
+        scheme => bail!(
+            "Invalid URL scheme '{}', expected 'http' or 'https'",
+            scheme
+        ),
     }
 }
 
@@ -101,8 +103,7 @@ where
     urls.into_iter()
         .enumerate()
         .map(|(i, url_str)| {
-            validate_url(url_str)
-                .with_context(|| format!("Failed to validate URL at index {}", i))
+            validate_url(url_str).with_context(|| format!("Failed to validate URL at index {}", i))
         })
         .collect()
 }
@@ -149,16 +150,12 @@ pub fn validate_indexnow_key(api_key: &str) -> Result<()> {
         );
     }
 
-    // Check if it's a valid hexadecimal string or UUID
-    let hex_regex = Regex::new(r"^[0-9a-fA-F]+$").unwrap();
-    let uuid_regex = Regex::new(
-        r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-    ).unwrap();
-
-    if !hex_regex.is_match(api_key) && !uuid_regex.is_match(api_key) {
-        bail!(
-            "IndexNow API key must contain only hexadecimal characters or be a valid UUID"
-        );
+    // Check allowed characters (alphanumeric + hyphen)
+    if !api_key
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-')
+    {
+        bail!("IndexNow API key must contain only alphanumeric characters and hyphens");
     }
 
     Ok(())
@@ -279,7 +276,10 @@ pub fn validate_date(date_str: &str) -> Result<NaiveDate> {
 /// let (start, end) = validate_date_range("2024-01-01", "2024-12-31").unwrap();
 /// assert!(start < end);
 /// ```
-pub fn validate_date_range(start_date_str: &str, end_date_str: &str) -> Result<(NaiveDate, NaiveDate)> {
+pub fn validate_date_range(
+    start_date_str: &str,
+    end_date_str: &str,
+) -> Result<(NaiveDate, NaiveDate)> {
     let start_date = validate_date(start_date_str)?;
     let end_date = validate_date(end_date_str)?;
 

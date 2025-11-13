@@ -15,7 +15,7 @@
 ## Features
 
 - **Google Indexing API Integration**
-  - OAuth2 authentication with service account
+  - Google service account authentication (JSON key)
   - URL submission with UPDATE/DELETE actions
   - Metadata retrieval and status checking
   - Intelligent rate limiting and quota management
@@ -144,17 +144,17 @@ See the [IndexNow Setup Guide](#indexnow-setup-guide) for detailed instructions.
 Submit a URL to all configured APIs:
 
 ```bash
-indexer-cli submit https://example.com/your-page
+indexer-cli submit https://your-site.com/your-page
 ```
 
 Or submit to a specific API:
 
 ```bash
 # Google only
-indexer-cli google submit https://example.com/your-page
+indexer-cli google submit https://your-site.com/your-page
 
 # IndexNow only
-indexer-cli indexnow submit https://example.com/your-page
+indexer-cli indexnow submit https://your-site.com/your-page
 ```
 
 ### 5. Submit from Sitemap
@@ -162,7 +162,7 @@ indexer-cli indexnow submit https://example.com/your-page
 Extract URLs from a sitemap and submit them:
 
 ```bash
-indexer-cli sitemap parse https://example.com/sitemap.xml | \
+indexer-cli sitemap parse https://your-site.com/sitemap.xml | \
   indexer-cli submit --file -
 ```
 
@@ -198,7 +198,7 @@ google:
 indexnow:
   enabled: true
   api_key: your-32-character-api-key-here
-  key_location: https://example.com/your-api-key.txt
+  key_location: https://your-site.com/your-api-key.txt
   endpoints:
     - https://api.indexnow.org/indexnow
     - https://www.bing.com/indexnow
@@ -207,7 +207,7 @@ indexnow:
 
 # Sitemap Configuration
 sitemap:
-  url: https://example.com/sitemap.xml
+  url: https://your-site.com/sitemap.xml
   follow_index: true
   filters:
     url_pattern: ".*"
@@ -294,27 +294,27 @@ Submit one or more URLs:
 
 ```bash
 # Single URL
-indexer-cli google submit https://example.com/page1
+indexer-cli google submit https://your-site.com/page1
 
 # Multiple URLs
-indexer-cli google submit https://example.com/page1 https://example.com/page2
+indexer-cli google submit https://your-site.com/page1 https://your-site.com/page2
 
 # From file (one URL per line)
 indexer-cli google submit --file urls.txt
 
 # From sitemap
-indexer-cli google submit --sitemap https://example.com/sitemap.xml
+indexer-cli google submit --sitemap https://your-site.com/sitemap.xml
 
 # With DELETE action
-indexer-cli google submit https://example.com/old-page --action url-deleted
+indexer-cli google submit https://your-site.com/old-page --action url-deleted
 
 # With filters
-indexer-cli google submit --sitemap https://example.com/sitemap.xml \
-  --filter "^https://example.com/blog/" \
+indexer-cli google submit --sitemap https://your-site.com/sitemap.xml \
+  --filter "^https://your-site.com/blog/" \
   --since 2024-01-01
 
 # Dry run (don't actually submit)
-indexer-cli google submit https://example.com/page1 --dry-run
+indexer-cli google submit https://your-site.com/page1 --dry-run
 ```
 
 #### Check Status
@@ -323,13 +323,13 @@ Check the indexing status of URLs:
 
 ```bash
 # Check single URL
-indexer-cli google status https://example.com/page1
+indexer-cli google status https://your-site.com/page1
 
 # Check multiple URLs
 indexer-cli google status --file urls.txt
 
 # Output as JSON
-indexer-cli google status https://example.com/page1 --format json
+indexer-cli google status https://your-site.com/page1 --format json
 ```
 
 #### Quota Management
@@ -358,7 +358,7 @@ indexer-cli indexnow generate-key --length 32 --output /var/www/html/
 
 # Set an existing key
 indexer-cli indexnow setup --key your-api-key-here \
-  --key-location https://example.com/your-api-key.txt
+  --key-location https://your-site.com/your-api-key.txt
 
 # Verify key file is accessible
 indexer-cli indexnow verify
@@ -370,23 +370,23 @@ Submit URLs to IndexNow:
 
 ```bash
 # Single URL
-indexer-cli indexnow submit https://example.com/page1
+indexer-cli indexnow submit https://your-site.com/page1
 
 # Multiple URLs
-indexer-cli indexnow submit https://example.com/page1 https://example.com/page2
+indexer-cli indexnow submit https://your-site.com/page1 https://your-site.com/page2
 
 # From file
 indexer-cli indexnow submit --file urls.txt
 
 # From sitemap
-indexer-cli indexnow submit --sitemap https://example.com/sitemap.xml
+indexer-cli indexnow submit --sitemap https://your-site.com/sitemap.xml
 
 # To specific endpoint only
-indexer-cli indexnow submit https://example.com/page1 --endpoint bing
+indexer-cli indexnow submit https://your-site.com/page1 --endpoint bing
 
 # With filters
-indexer-cli indexnow submit --sitemap https://example.com/sitemap.xml \
-  --filter "^https://example.com/products/" \
+indexer-cli indexnow submit --sitemap https://your-site.com/sitemap.xml \
+  --filter "^https://your-site.com/products/" \
   --since 2024-01-01
 
 # Batch size control
@@ -399,21 +399,21 @@ Submit to all configured APIs at once:
 
 ```bash
 # Submit to all APIs
-indexer-cli submit https://example.com/page1
+indexer-cli submit https://your-site.com/page1
 
 # From file
 indexer-cli submit --file urls.txt
 
 # From sitemap
-indexer-cli submit --sitemap https://example.com/sitemap.xml
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml
 
 # To specific API
-indexer-cli submit https://example.com/page1 --api google
-indexer-cli submit https://example.com/page1 --api indexnow
+indexer-cli submit https://your-site.com/page1 --api google
+indexer-cli submit https://your-site.com/page1 --api indexnow
 
 # With options
-indexer-cli submit --sitemap https://example.com/sitemap.xml \
-  --filter "^https://example.com/" \
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml \
+  --filter "^https://your-site.com/" \
   --since 2024-01-01 \
   --batch-size 50 \
   --format json
@@ -427,13 +427,13 @@ Parse and display sitemap contents:
 
 ```bash
 # Parse sitemap
-indexer-cli sitemap parse https://example.com/sitemap.xml
+indexer-cli sitemap parse https://your-site.com/sitemap.xml
 
 # Follow sitemap indexes
-indexer-cli sitemap parse https://example.com/sitemap.xml --follow-index
+indexer-cli sitemap parse https://your-site.com/sitemap.xml --follow-index
 
 # Output as JSON
-indexer-cli sitemap parse https://example.com/sitemap.xml --format json
+indexer-cli sitemap parse https://your-site.com/sitemap.xml --format json
 ```
 
 #### List URLs
@@ -442,18 +442,18 @@ List all URLs from a sitemap:
 
 ```bash
 # List all URLs
-indexer-cli sitemap list https://example.com/sitemap.xml
+indexer-cli sitemap list https://your-site.com/sitemap.xml
 
 # With filter
-indexer-cli sitemap list https://example.com/sitemap.xml \
-  --filter "^https://example.com/blog/"
+indexer-cli sitemap list https://your-site.com/sitemap.xml \
+  --filter "^https://your-site.com/blog/"
 
 # Modified after date
-indexer-cli sitemap list https://example.com/sitemap.xml \
+indexer-cli sitemap list https://your-site.com/sitemap.xml \
   --since 2024-01-01
 
 # Limit results
-indexer-cli sitemap list https://example.com/sitemap.xml --limit 100
+indexer-cli sitemap list https://your-site.com/sitemap.xml --limit 100
 ```
 
 #### Export URLs
@@ -462,12 +462,12 @@ Export sitemap URLs to a file:
 
 ```bash
 # Export to text file
-indexer-cli sitemap export https://example.com/sitemap.xml --output urls.txt
+indexer-cli sitemap export https://your-site.com/sitemap.xml --output urls.txt
 
 # With filters
-indexer-cli sitemap export https://example.com/sitemap.xml \
+indexer-cli sitemap export https://your-site.com/sitemap.xml \
   --output urls.txt \
-  --filter "^https://example.com/products/" \
+  --filter "^https://your-site.com/products/" \
   --since 2024-01-01
 ```
 
@@ -477,10 +477,10 @@ Show sitemap statistics:
 
 ```bash
 # Display stats
-indexer-cli sitemap stats https://example.com/sitemap.xml
+indexer-cli sitemap stats https://your-site.com/sitemap.xml
 
 # Output as JSON
-indexer-cli sitemap stats https://example.com/sitemap.xml --format json
+indexer-cli sitemap stats https://your-site.com/sitemap.xml --format json
 ```
 
 #### Validate Sitemap
@@ -488,7 +488,7 @@ indexer-cli sitemap stats https://example.com/sitemap.xml --format json
 Validate sitemap format and structure:
 
 ```bash
-indexer-cli sitemap validate https://example.com/sitemap.xml
+indexer-cli sitemap validate https://your-site.com/sitemap.xml
 ```
 
 ### Submission History
@@ -586,19 +586,19 @@ Continuously monitor a sitemap for changes and auto-submit new URLs:
 
 ```bash
 # Watch sitemap (check every hour)
-indexer-cli watch --sitemap https://example.com/sitemap.xml
+indexer-cli watch --sitemap https://your-site.com/sitemap.xml
 
 # Custom check interval (in seconds)
-indexer-cli watch --sitemap https://example.com/sitemap.xml --interval 1800
+indexer-cli watch --sitemap https://your-site.com/sitemap.xml --interval 1800
 
 # Submit to specific API
-indexer-cli watch --sitemap https://example.com/sitemap.xml --api google
+indexer-cli watch --sitemap https://your-site.com/sitemap.xml --api google
 
 # Run as daemon
-indexer-cli watch --sitemap https://example.com/sitemap.xml --daemon
+indexer-cli watch --sitemap https://your-site.com/sitemap.xml --daemon
 
 # With PID file
-indexer-cli watch --sitemap https://example.com/sitemap.xml \
+indexer-cli watch --sitemap https://your-site.com/sitemap.xml \
   --daemon --pid-file /var/run/indexer-cli.pid
 ```
 
@@ -647,111 +647,23 @@ indexer-cli validate --check-key-file
 indexer-cli validate --format json
 ```
 
+> `--check-key-file` now downloads the configured `indexnow.key_location` from your site and compares its contents with your API key, making it easy to confirm the target domain actually exposes the IndexNow key file.
+
 ## Google Setup Guide
 
-Google Indexing API supports two authentication methods:
-
-1. **OAuth 2.0** (Recommended for personal use) - User-friendly, browser-based authentication
-2. **Service Account** (For automation/CI/CD) - Requires more setup but better for server environments
-
-Choose the method that best fits your use case.
+indexer-cli authenticates with Google using a **service account JSON key**. If you're migrating from an older version that used `indexer-cli google auth`, you can delete those OAuth tokens—the CLI no longer needs them.
 
 ### Prerequisites
 
-1. A Google Cloud Platform (GCP) account
-2. A website verified in Google Search Console
-3. The website URL added as a site property
+1. A Google Cloud Platform (GCP) project
+2. The website verified in Google Search Console
+3. The service account email added as an **Owner** on that Search Console property
 
 ---
 
-## Method 1: OAuth 2.0 Authentication (Recommended)
+## Service Account Authentication (Required)
 
-OAuth 2.0 provides a simple, user-friendly authentication flow that doesn't require downloading JSON files or managing service accounts.
-
-### Quick Start
-
-If you want to get started immediately, see the detailed guide:
-
-**[📖 Complete OAuth Setup Guide](docs/google-oauth-setup.md)**
-
-### Overview
-
-The OAuth method allows you to authenticate using your Google account through a browser. No need to create service accounts or download JSON files!
-
-### Step 1: Create OAuth Credentials
-
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the **Indexing API**:
-   - Navigate to **APIs & Services** > **Library**
-   - Search for "Indexing API"
-   - Click **Enable**
-4. Create OAuth 2.0 credentials:
-   - Go to **APIs & Services** > **Credentials**
-   - Click **Create Credentials** > **OAuth client ID**
-   - Choose **Desktop app** or **Web application**
-   - Add redirect URI: `http://localhost:8080/oauth/callback`
-   - Copy the Client ID and Client Secret
-
-### Step 2: Configure Credentials
-
-Choose one of these methods:
-
-**Option A - Environment Variables (Recommended):**
-```bash
-export GOOGLE_OAUTH_CLIENT_ID="YOUR_CLIENT_ID.apps.googleusercontent.com"
-export GOOGLE_OAUTH_CLIENT_SECRET="YOUR_CLIENT_SECRET"
-```
-
-**Option B - Configuration File:**
-```yaml
-# indexer.yaml
-google:
-  auth:
-    method: oauth
-    oauth_client_id: "YOUR_CLIENT_ID.apps.googleusercontent.com"
-    oauth_client_secret: "YOUR_CLIENT_SECRET"
-```
-
-**Option C - Command Line:**
-```bash
-indexer-cli google auth \
-  --client-id "YOUR_CLIENT_ID.apps.googleusercontent.com" \
-  --client-secret "YOUR_CLIENT_SECRET"
-```
-
-### Step 3: Authenticate
-
-```bash
-indexer-cli google auth
-```
-
-This will:
-1. Open your browser to Google's authorization page
-2. Ask you to sign in and grant permissions
-3. Save the access token locally
-4. Automatically refresh the token when needed
-
-### Step 4: Verify
-
-```bash
-indexer-cli google verify
-```
-
-### Troubleshooting
-
-If you see the error:
-```
-Error: OAuth client credentials not configured
-```
-
-This means you need to create your own OAuth credentials. The default credentials are placeholders. Follow the steps above or see the [detailed OAuth guide](docs/google-oauth-setup.md).
-
----
-
-## Method 2: Service Account Authentication (Advanced)
-
-Service accounts are better for automation, server environments, and CI/CD pipelines. This method doesn't require browser interaction.
+Service accounts work great for local use, servers, and CI/CD since they rely on a downloaded JSON key. The same account is used for every command (verify, submit, status, etc.).
 
 ### Step 1: Create a GCP Project
 
@@ -799,19 +711,6 @@ indexer-cli google setup --service-account ~/.indexer-cli/service-account.json
 indexer-cli google verify
 ```
 
----
-
-## Authentication Comparison
-
-| Feature | OAuth 2.0 | Service Account |
-|---------|-----------|-----------------|
-| Setup complexity | Simple | Moderate |
-| Browser required | Yes (first time only) | No |
-| Best for | Personal use, development | Automation, CI/CD, servers |
-| Credentials management | Browser tokens | JSON key file |
-| User interaction | Initial auth only | None |
-| Token refresh | Automatic | Automatic |
-| Search Console access | Your Google account | Service account email |
 
 ### Quota Limits
 
@@ -920,7 +819,7 @@ Process large numbers of URLs efficiently:
 
 ```bash
 # From sitemap with custom batch size
-indexer-cli submit --sitemap https://example.com/sitemap.xml \
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml \
   --batch-size 100
 
 # Multiple sitemaps
@@ -935,16 +834,31 @@ Filter URLs using regex patterns:
 
 ```bash
 # Submit only blog posts
-indexer-cli submit --sitemap https://example.com/sitemap.xml \
-  --filter "^https://example.com/blog/\d{4}/\d{2}/"
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml \
+  --filter "^https://your-site.com/blog/\d{4}/\d{2}/"
 
 # Exclude certain patterns
-indexer-cli submit --sitemap https://example.com/sitemap.xml \
-  --filter "^https://example.com/(?!admin|private)"
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml \
+  --filter "^https://your-site.com/(?!admin|private)"
 
 # Date-based filtering
-indexer-cli submit --sitemap https://example.com/sitemap.xml \
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml \
   --since 2024-01-01
+```
+
+### Force Submissions
+
+By default, `indexer-cli` skips URLs that were submitted within the last 24 hours based on the local history database. Use `--force` (or `-F`) when you need to bypass that throttle for an urgent re-submission while still recording the attempt:
+
+```bash
+# Force a unified submission
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml --force
+
+# Force IndexNow-only submission
+indexer-cli indexnow submit https://your-site.com/page1 --force
+
+# Force Google-only submission
+indexer-cli google submit https://your-site.com/page1 --force
 ```
 
 ### Custom Retry Strategies
@@ -965,10 +879,10 @@ Control logging output:
 
 ```bash
 # Verbose output
-indexer-cli --verbose submit https://example.com/page1
+indexer-cli --verbose submit https://your-site.com/page1
 
 # Quiet mode (errors only)
-indexer-cli --quiet submit https://example.com/page1
+indexer-cli --quiet submit https://your-site.com/page1
 
 # Debug logging in config
 logging:
@@ -1007,7 +921,7 @@ Set up automated submissions:
 # Add to crontab (crontab -e)
 
 # Submit sitemap daily at 3 AM
-0 3 * * * /usr/local/bin/indexer-cli submit --sitemap https://example.com/sitemap.xml
+0 3 * * * /usr/local/bin/indexer-cli submit --sitemap https://your-site.com/sitemap.xml
 
 # Clean history monthly
 0 0 1 * * /usr/local/bin/indexer-cli history clean --older-than 180 --yes
@@ -1030,7 +944,7 @@ Test without actually submitting:
 
 ```bash
 # See what would be submitted
-indexer-cli submit --sitemap https://example.com/sitemap.xml --dry-run
+indexer-cli submit --sitemap https://your-site.com/sitemap.xml --dry-run
 ```
 
 ## Architecture
@@ -1058,7 +972,7 @@ indexer-cli submit --sitemap https://example.com/sitemap.xml --dry-run
          │
 ┌────────▼─────────────────────┐
 │       API Clients            │
-│  - Google Indexing (OAuth2)  │
+│  - Google Indexing (Service Account) │
 │  - IndexNow (HTTP)           │
 └──────────────────────────────┘
 ```
@@ -1079,7 +993,7 @@ indexer-cli submit --sitemap https://example.com/sitemap.xml --dry-run
 
 1. **User Input** → CLI argument parsing
 2. **Configuration Loading** → Merge config file + environment + defaults
-3. **API Client Initialization** → OAuth2 or API key authentication
+3. **API Client Initialization** → Service account or API key authentication
 4. **URL Collection** → From args, file, or sitemap
 5. **History Check** → Filter out recently submitted URLs
 6. **Batch Processing** → Split into batches, concurrent submission
@@ -1147,7 +1061,7 @@ cargo build
 cargo test
 
 # Run with debug logging
-RUST_LOG=debug cargo run -- submit https://example.com
+RUST_LOG=debug cargo run -- submit https://your-site.com
 ```
 
 ### Project Structure
@@ -1310,7 +1224,7 @@ If you encounter issues not covered here:
 
 **Q: What is the difference between Google Indexing API and IndexNow?**
 
-A: Google Indexing API is specifically for Google Search and requires OAuth2 authentication with a service account. It has strict quota limits (200 URLs/day) but provides detailed status information. IndexNow is an open protocol supported by multiple search engines (Bing, Yandex, Seznam, Naver) with higher limits (10,000 URLs/batch) but requires only an API key.
+A: Google Indexing API is specifically for Google Search and requires a Google Cloud service account JSON key. It has strict quota limits (200 URLs/day) but provides detailed status information. IndexNow is an open protocol supported by multiple search engines (Bing, Yandex, Seznam, Naver) with higher limits (10,000 URLs/batch) but requires only an API key.
 
 **Q: Can I use both APIs together?**
 
@@ -1456,7 +1370,7 @@ Built with these excellent Rust crates:
 - [tokio](https://github.com/tokio-rs/tokio) - Async runtime
 - [reqwest](https://github.com/seanmonstar/reqwest) - HTTP client
 - [rusqlite](https://github.com/rusqlite/rusqlite) - SQLite bindings
-- [yup-oauth2](https://github.com/dermesser/yup-oauth2) - OAuth2 authentication
+- [yup-oauth2](https://github.com/dermesser/yup-oauth2) - Google service account authentication
 - [serde](https://github.com/serde-rs/serde) - Serialization framework
 - [roxmltree](https://github.com/RazrFalcon/roxmltree) - XML parsing
 - [indicatif](https://github.com/console-rs/indicatif) - Progress bars

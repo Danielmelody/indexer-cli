@@ -58,10 +58,7 @@ pub enum IndexerError {
 
     /// Google API request failed
     #[error("Google API request failed (HTTP {status_code}): {message}")]
-    GoogleApiError {
-        status_code: u16,
-        message: String,
-    },
+    GoogleApiError { status_code: u16, message: String },
 
     /// Google API quota exceeded
     #[error("Google API quota exceeded: {message}")]
@@ -84,10 +81,7 @@ pub enum IndexerError {
     // ============================================================================
     /// IndexNow API request failed
     #[error("IndexNow API request failed (HTTP {status_code}): {message}")]
-    IndexNowApiError {
-        status_code: u16,
-        message: String,
-    },
+    IndexNowApiError { status_code: u16, message: String },
 
     /// IndexNow API key invalid (403)
     #[error("IndexNow API key is invalid or verification failed")]
@@ -98,7 +92,9 @@ pub enum IndexerError {
     IndexNowBadRequest { message: String },
 
     /// IndexNow API unprocessable entity (422)
-    #[error("IndexNow API unprocessable entity: {message}. URL may not belong to host or key mismatch.")]
+    #[error(
+        "IndexNow API unprocessable entity: {message}. URL may not belong to host or key mismatch."
+    )]
     IndexNowUnprocessableEntity { message: String },
 
     /// IndexNow API rate limit (429)
@@ -112,6 +108,15 @@ pub enum IndexerError {
     /// IndexNow key file content mismatch
     #[error("IndexNow key file content mismatch. Expected '{expected}' but got '{actual}'")]
     IndexNowKeyFileMismatch { expected: String, actual: String },
+
+    /// IndexNow key location host mismatch
+    #[error(
+        "IndexNow key location host mismatch: expected '{expected_host}', got '{actual_host}'"
+    )]
+    IndexNowKeyLocationMismatch {
+        expected_host: String,
+        actual_host: String,
+    },
 
     // ============================================================================
     // Network Errors
@@ -414,7 +419,8 @@ impl IndexerError {
             | Self::IndexNowUnprocessableEntity { .. }
             | Self::IndexNowRateLimitExceeded
             | Self::IndexNowKeyFileNotAccessible { .. }
-            | Self::IndexNowKeyFileMismatch { .. } => 30,
+            | Self::IndexNowKeyFileMismatch { .. }
+            | Self::IndexNowKeyLocationMismatch { .. } => 30,
 
             // Network errors: 40-49
             Self::HttpRequestFailed { .. }

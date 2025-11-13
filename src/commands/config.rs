@@ -4,15 +4,15 @@
 //! including listing, getting, setting, and validating configuration values.
 
 use crate::cli::args::{Cli, ConfigArgs, ConfigCommand, ConfigGetArgs, ConfigSetArgs};
-use crate::config::{
-    load_config, load_from_file, save_global_config, save_project_config,
-    get_global_config_path, find_project_config,
-};
-use crate::config::validation::{validate_config, ValidationReport};
 use crate::config::settings::Settings;
-use crate::types::{Result, IndexerError};
-use colored::Colorize;
+use crate::config::validation::{validate_config, ValidationReport};
+use crate::config::{
+    find_project_config, get_global_config_path, load_config, load_from_file, save_global_config,
+    save_project_config,
+};
+use crate::types::{IndexerError, Result};
 use anyhow::Context;
+use colored::Colorize;
 use std::path::PathBuf;
 
 /// Run the config command
@@ -35,8 +35,8 @@ async fn list_config(cli: &Cli) -> Result<()> {
     println!("{}", "━".repeat(60).dimmed());
     println!();
 
-    let yaml = serde_yaml::to_string(&settings)
-        .context("Failed to serialize configuration to YAML")?;
+    let yaml =
+        serde_yaml::to_string(&settings).context("Failed to serialize configuration to YAML")?;
 
     // Print with syntax highlighting (simple coloring)
     for line in yaml.lines() {
@@ -166,7 +166,11 @@ async fn show_config_path(cli: &Cli) -> Result<()> {
         println!("  {}", "✓ File exists".green());
         println!();
     } else {
-        println!("{} {}", "Project:".bright_blue().bold(), "None found".dimmed());
+        println!(
+            "{} {}",
+            "Project:".bright_blue().bold(),
+            "None found".dimmed()
+        );
         println!("  {} indexer.yaml", "Would use:".dimmed());
         println!();
     }
@@ -196,14 +200,12 @@ async fn show_config_path(cli: &Cli) -> Result<()> {
 fn load_config_for_cli(cli: &Cli) -> Result<Settings> {
     if let Some(ref config_path) = cli.config {
         // Use explicit config file if provided
-        load_from_file(config_path)
-            .map_err(|_e| IndexerError::ConfigFileNotFound {
-                path: config_path.clone(),
-            })
+        load_from_file(config_path).map_err(|_e| IndexerError::ConfigFileNotFound {
+            path: config_path.clone(),
+        })
     } else {
         // Use standard config loading
-        load_config()
-            .map_err(|e| IndexerError::Other(e))
+        load_config().map_err(|e| IndexerError::Other(e))
     }
 }
 
@@ -219,10 +221,16 @@ fn show_config_sources(cli: &Cli) -> Result<()> {
 
         if find_project_config().is_some() {
             println!("  {} Project config (./indexer.yaml)", "2.".dimmed());
-            println!("  {} Global config (~/.indexer-cli/config.yaml)", "3.".dimmed());
+            println!(
+                "  {} Global config (~/.indexer-cli/config.yaml)",
+                "3.".dimmed()
+            );
         } else {
             println!("  {} Project config (not found)", "2.".dimmed());
-            println!("  {} Global config (~/.indexer-cli/config.yaml)", "3.".dimmed());
+            println!(
+                "  {} Global config (~/.indexer-cli/config.yaml)",
+                "3.".dimmed()
+            );
         }
 
         println!("  {} Default values", "4.".dimmed());
@@ -286,7 +294,8 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.google.as_mut().unwrap().service_account_file = Some(PathBuf::from(value));
         }
         ["google", "batch_size"] => {
-            let batch_size = value.parse::<usize>()
+            let batch_size = value
+                .parse::<usize>()
                 .context("Batch size must be a positive integer")?;
             if settings.google.is_none() {
                 settings.google = Some(Default::default());
@@ -294,7 +303,8 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.google.as_mut().unwrap().batch_size = batch_size;
         }
         ["google", "quota", "daily_limit"] => {
-            let daily_limit = value.parse::<u32>()
+            let daily_limit = value
+                .parse::<u32>()
                 .context("Daily limit must be a positive integer")?;
             if settings.google.is_none() {
                 settings.google = Some(Default::default());
@@ -302,7 +312,8 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.google.as_mut().unwrap().quota.daily_limit = daily_limit;
         }
         ["google", "quota", "rate_limit"] => {
-            let rate_limit = value.parse::<u32>()
+            let rate_limit = value
+                .parse::<u32>()
                 .context("Rate limit must be a positive integer")?;
             if settings.google.is_none() {
                 settings.google = Some(Default::default());
@@ -331,7 +342,8 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.indexnow.as_mut().unwrap().key_location = value.to_string();
         }
         ["indexnow", "batch_size"] => {
-            let batch_size = value.parse::<usize>()
+            let batch_size = value
+                .parse::<usize>()
                 .context("Batch size must be a positive integer")?;
             if settings.indexnow.is_none() {
                 settings.indexnow = Some(Default::default());
@@ -362,7 +374,8 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.history.database_path = value.to_string();
         }
         ["history", "retention_days"] => {
-            settings.history.retention_days = value.parse::<u32>()
+            settings.history.retention_days = value
+                .parse::<u32>()
                 .context("Retention days must be a positive integer")?;
         }
 
@@ -374,11 +387,13 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.logging.file = value.to_string();
         }
         ["logging", "max_size_mb"] => {
-            settings.logging.max_size_mb = value.parse::<u32>()
+            settings.logging.max_size_mb = value
+                .parse::<u32>()
                 .context("Max size must be a positive integer")?;
         }
         ["logging", "max_backups"] => {
-            settings.logging.max_backups = value.parse::<u32>()
+            settings.logging.max_backups = value
+                .parse::<u32>()
                 .context("Max backups must be a positive integer")?;
         }
 
@@ -387,15 +402,18 @@ fn set_value_by_key(settings: &mut Settings, key: &str, value: &str) -> Result<(
             settings.retry.enabled = parse_bool(value)?;
         }
         ["retry", "max_attempts"] => {
-            settings.retry.max_attempts = value.parse::<u32>()
+            settings.retry.max_attempts = value
+                .parse::<u32>()
                 .context("Max attempts must be a positive integer")?;
         }
         ["retry", "backoff_factor"] => {
-            settings.retry.backoff_factor = value.parse::<u32>()
+            settings.retry.backoff_factor = value
+                .parse::<u32>()
                 .context("Backoff factor must be a positive integer")?;
         }
         ["retry", "max_wait_seconds"] => {
-            settings.retry.max_wait_seconds = value.parse::<u64>()
+            settings.retry.max_wait_seconds = value
+                .parse::<u64>()
                 .context("Max wait seconds must be a positive integer")?;
         }
 
@@ -427,66 +445,66 @@ fn get_value_by_key(settings: &Settings, key: &str) -> Result<String> {
 
     let value = match parts.as_slice() {
         // Google configuration
-        ["google", "enabled"] => {
-            settings.google.as_ref()
-                .map(|g| g.enabled.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["google", "service_account_file"] => {
-            settings.google.as_ref()
-                .and_then(|g| g.service_account_file.as_ref())
-                .map(|p| p.display().to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["google", "batch_size"] => {
-            settings.google.as_ref()
-                .map(|g| g.batch_size.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["google", "quota", "daily_limit"] => {
-            settings.google.as_ref()
-                .map(|g| g.quota.daily_limit.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["google", "quota", "rate_limit"] => {
-            settings.google.as_ref()
-                .map(|g| g.quota.rate_limit.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
+        ["google", "enabled"] => settings
+            .google
+            .as_ref()
+            .map(|g| g.enabled.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        ["google", "service_account_file"] => settings
+            .google
+            .as_ref()
+            .and_then(|g| g.service_account_file.as_ref())
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        ["google", "batch_size"] => settings
+            .google
+            .as_ref()
+            .map(|g| g.batch_size.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        ["google", "quota", "daily_limit"] => settings
+            .google
+            .as_ref()
+            .map(|g| g.quota.daily_limit.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        ["google", "quota", "rate_limit"] => settings
+            .google
+            .as_ref()
+            .map(|g| g.quota.rate_limit.to_string())
+            .unwrap_or_else(|| "null".to_string()),
 
         // IndexNow configuration
-        ["indexnow", "enabled"] => {
-            settings.indexnow.as_ref()
-                .map(|i| i.enabled.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["indexnow", "api_key"] => {
-            settings.indexnow.as_ref()
-                .map(|i| i.api_key.clone())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["indexnow", "key_location"] => {
-            settings.indexnow.as_ref()
-                .map(|i| i.key_location.clone())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["indexnow", "batch_size"] => {
-            settings.indexnow.as_ref()
-                .map(|i| i.batch_size.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
+        ["indexnow", "enabled"] => settings
+            .indexnow
+            .as_ref()
+            .map(|i| i.enabled.to_string())
+            .unwrap_or_else(|| "null".to_string()),
+        ["indexnow", "api_key"] => settings
+            .indexnow
+            .as_ref()
+            .map(|i| i.api_key.clone())
+            .unwrap_or_else(|| "null".to_string()),
+        ["indexnow", "key_location"] => settings
+            .indexnow
+            .as_ref()
+            .map(|i| i.key_location.clone())
+            .unwrap_or_else(|| "null".to_string()),
+        ["indexnow", "batch_size"] => settings
+            .indexnow
+            .as_ref()
+            .map(|i| i.batch_size.to_string())
+            .unwrap_or_else(|| "null".to_string()),
 
         // Sitemap configuration
-        ["sitemap", "url"] => {
-            settings.sitemap.as_ref()
-                .map(|s| s.url.clone())
-                .unwrap_or_else(|| "null".to_string())
-        }
-        ["sitemap", "follow_index"] => {
-            settings.sitemap.as_ref()
-                .map(|s| s.follow_index.to_string())
-                .unwrap_or_else(|| "null".to_string())
-        }
+        ["sitemap", "url"] => settings
+            .sitemap
+            .as_ref()
+            .map(|s| s.url.clone())
+            .unwrap_or_else(|| "null".to_string()),
+        ["sitemap", "follow_index"] => settings
+            .sitemap
+            .as_ref()
+            .map(|s| s.follow_index.to_string())
+            .unwrap_or_else(|| "null".to_string()),
 
         // History configuration
         ["history", "enabled"] => settings.history.enabled.to_string(),
@@ -560,15 +578,24 @@ mod tests {
 
         // Test setting and getting a simple value
         set_value_by_key(&mut settings, "logging.level", "debug").unwrap();
-        assert_eq!(get_value_by_key(&settings, "logging.level").unwrap(), "debug");
+        assert_eq!(
+            get_value_by_key(&settings, "logging.level").unwrap(),
+            "debug"
+        );
 
         // Test setting and getting a boolean
         set_value_by_key(&mut settings, "history.enabled", "false").unwrap();
-        assert_eq!(get_value_by_key(&settings, "history.enabled").unwrap(), "false");
+        assert_eq!(
+            get_value_by_key(&settings, "history.enabled").unwrap(),
+            "false"
+        );
 
         // Test setting and getting a numeric value
         set_value_by_key(&mut settings, "history.retention_days", "180").unwrap();
-        assert_eq!(get_value_by_key(&settings, "history.retention_days").unwrap(), "180");
+        assert_eq!(
+            get_value_by_key(&settings, "history.retention_days").unwrap(),
+            "180"
+        );
     }
 
     #[test]
