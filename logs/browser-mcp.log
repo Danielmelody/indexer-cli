@@ -42,3 +42,7 @@
 {"duration":831,"level":"info","message":"URL fetch completed","redirectCount":0,"service":"fetch-client","status":403,"timestamp":"2025-11-09T19:46:39.402Z","url":"https://api.indexnow.org/indexnow"}
 {"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-09T20:07:44.671Z"}
 {"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-10T09:52:45.550Z"}
+{"level":"info","message":"Initializing browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-13T08:24:34.897Z"}
+{"interval":60000,"level":"info","message":"Starting cleanup scheduler","service":"browser-sandbox","timestamp":"2025-11-13T08:24:34.899Z"}
+{"level":"info","message":"Browser sandbox manager initialized successfully","service":"browser-sandbox","timestamp":"2025-11-13T08:24:34.899Z"}
+{"level":"info","message":"Shutting down browser sandbox manager","service":"browser-sandbox","timestamp":"2025-11-13T09:01:44.273Z"}
