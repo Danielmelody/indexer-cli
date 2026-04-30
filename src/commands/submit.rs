@@ -265,6 +265,10 @@ pub async fn run(args: SubmitArgs, cli: &Cli) -> Result<()> {
         .with_check_history(!(args.skip_history || args.force))
         .with_progress_bar(!cli.quiet);
 
+    if let Some(google_cfg) = config.google.as_ref() {
+        batch_config = batch_config.with_google_daily_limit(google_cfg.quota.daily_limit as usize);
+    }
+
     match args.batch_size {
         Some(batch_size) => {
             batch_config = batch_config
@@ -579,6 +583,19 @@ fn print_result_text(
         println!("  Successful:  {}", google_results.successful);
         println!("  Failed:      {}", google_results.failed);
 
+        if !google_results.warnings.is_empty() {
+            println!("  Warnings:");
+            for (i, warning) in google_results.warnings.iter().take(5).enumerate() {
+                println!("    {}. {}", i + 1, warning);
+            }
+            if google_results.warnings.len() > 5 {
+                println!(
+                    "    ... and {} more warnings",
+                    google_results.warnings.len() - 5
+                );
+            }
+        }
+
         if !google_results.errors.is_empty() {
             println!("  Errors:");
             for (i, error) in google_results.errors.iter().take(5).enumerate() {
@@ -642,11 +659,13 @@ fn print_result_json(result: &crate::services::batch_submitter::BatchResult) -> 
             "successful": r.successful,
             "failed": r.failed,
             "errors": r.errors,
+            "warnings": r.warnings,
         })),
         "indexnow": result.indexnow_results.as_ref().map(|r| serde_json::json!({
             "successful": r.successful,
             "failed": r.failed,
             "errors": r.errors,
+            "warnings": r.warnings,
         })),
     });
 

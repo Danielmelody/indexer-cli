@@ -6,6 +6,7 @@
 
 use crate::api::google_indexing::{GoogleIndexingClient, NotificationType};
 use crate::api::indexnow::IndexNowClient;
+use crate::constants::GOOGLE_QUOTA_PUBLISH_PER_DAY;
 use crate::database::models::{ActionType, ApiType, SubmissionRecord, SubmissionStatus};
 use crate::database::queries::{check_url_submitted, insert_submission};
 use crate::types::error::IndexerError;
@@ -26,6 +27,9 @@ const INDEXNOW_MAX_BATCH_SIZE: usize = 10_000;
 /// Default concurrent batches to process
 const DEFAULT_CONCURRENT_BATCHES: usize = 3;
 
+/// Default maximum Google publish requests per run
+const DEFAULT_GOOGLE_DAILY_LIMIT: usize = GOOGLE_QUOTA_PUBLISH_PER_DAY as usize;
+
 // =============================================================================
 // Configuration
 // =============================================================================
@@ -38,6 +42,9 @@ pub struct BatchConfig {
 
     /// Batch size for IndexNow submissions (max 10,000)
     pub indexnow_batch_size: usize,
+
+    /// Maximum Google URLs to submit per run
+    pub google_daily_limit: usize,
 
     /// Whether to check history before submission
     pub check_history: bool,
@@ -54,6 +61,7 @@ impl Default for BatchConfig {
         Self {
             google_batch_size: GOOGLE_MAX_BATCH_SIZE,
             indexnow_batch_size: INDEXNOW_MAX_BATCH_SIZE,
+            google_daily_limit: DEFAULT_GOOGLE_DAILY_LIMIT,
             check_history: true,
             concurrent_batches: DEFAULT_CONCURRENT_BATCHES,
             progress_bar: true,
@@ -76,6 +84,12 @@ impl BatchConfig {
     /// Set IndexNow batch size (will be capped at max allowed)
     pub fn with_indexnow_batch_size(mut self, size: usize) -> Self {
         self.indexnow_batch_size = size.min(INDEXNOW_MAX_BATCH_SIZE);
+        self
+    }
+
+    /// Set maximum Google URLs to submit per run
+    pub fn with_google_daily_limit(mut self, limit: usize) -> Self {
+        self.google_daily_limit = limit;
         self
     }
 
@@ -113,6 +127,9 @@ pub struct ApiResults {
 
     /// List of error messages
     pub errors: Vec<String>,
+
+    /// List of non-fatal warning messages
+    pub warnings: Vec<String>,
 }
 
 impl ApiResults {
@@ -122,6 +139,7 @@ impl ApiResults {
             successful: 0,
             failed: 0,
             errors: Vec::new(),
+            warnings: Vec::new(),
         }
     }
 
@@ -135,6 +153,22 @@ impl ApiResults {
         self.failed += 1;
         self.errors.push(error);
     }
+
+    /// Add a non-fatal warning
+    fn add_warning(&mut self, warning: String) {
+        self.warnings.push(warning);
+    }
+}
+
+fn limit_google_urls_for_run(
+    urls_to_submit: Vec<String>,
+    google_limit: usize,
+) -> (Vec<String>, usize) {
+    let original_len = urls_to_submit.len();
+    let limited_urls = urls_to_submit.into_iter().take(google_limit).collect();
+    let skipped = original_len.saturating_sub(google_limit);
+
+    (limited_urls, skipped)
 }
 
 /// Overall batch submission result
@@ -346,10 +380,24 @@ impl BatchSubmitter {
             urls.clone()
         };
 
-        result.skipped = total_urls - urls_to_submit.len();
-        result.submitted = urls_to_submit.len();
+        let history_skipped = total_urls - urls_to_submit.len();
+        let google_limit = self.config.google_daily_limit;
+        let (limited_urls_to_submit, quota_skipped) =
+            limit_google_urls_for_run(urls_to_submit, google_limit);
 
-        if urls_to_submit.is_empty() {
+        if quota_skipped > 0 {
+            let warning = format!(
+                "Google daily limit reached: submitting first {} new URL(s), skipped {} remaining URL(s)",
+                google_limit, quota_skipped
+            );
+            warn!("{}", warning);
+            api_results.add_warning(warning);
+        }
+
+        result.skipped = history_skipped + quota_skipped;
+        result.submitted = limited_urls_to_submit.len();
+
+        if limited_urls_to_submit.is_empty() {
             info!("All URLs already submitted recently, skipping");
             result.google_results = Some(api_results);
             return Ok(result);
@@ -357,7 +405,7 @@ impl BatchSubmitter {
 
         // Create progress bar
         let progress = if self.config.progress_bar {
-            let pb = ProgressBar::new(urls_to_submit.len() as u64);
+            let pb = ProgressBar::new(limited_urls_to_submit.len() as u64);
             pb.set_style(
                 ProgressStyle::default_bar()
                     .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos}/{len} {msg}")
@@ -371,7 +419,7 @@ impl BatchSubmitter {
         };
 
         // Split into batches
-        let batches: Vec<_> = urls_to_submit
+        let batches: Vec<_> = limited_urls_to_submit
             .chunks(self.config.google_batch_size)
             .map(|chunk| chunk.to_vec())
             .collect();
@@ -571,10 +619,8 @@ impl BatchSubmitter {
                                 "✗ IndexNow endpoint {} - Status: {} - {}",
                                 resp.endpoint, resp.status_code, resp.message
                             );
-                            batch_errors.push(format!(
-                                "Endpoint {}: {}",
-                                resp.endpoint, resp.message
-                            ));
+                            batch_errors
+                                .push(format!("Endpoint {}: {}", resp.endpoint, resp.message));
                         }
                     }
                     Err(e) => {
@@ -593,7 +639,10 @@ impl BatchSubmitter {
             let batch_success = successful_endpoints == total_endpoints;
 
             if batch_success {
-                info!("All {} IndexNow endpoints accepted batch: {} URLs", total_endpoints, batch_size);
+                info!(
+                    "All {} IndexNow endpoints accepted batch: {} URLs",
+                    total_endpoints, batch_size
+                );
                 api_results.successful += batch_size;
             } else {
                 warn!(
@@ -800,6 +849,7 @@ mod tests {
         let config = BatchConfig::default();
         assert_eq!(config.google_batch_size, GOOGLE_MAX_BATCH_SIZE);
         assert_eq!(config.indexnow_batch_size, INDEXNOW_MAX_BATCH_SIZE);
+        assert_eq!(config.google_daily_limit, DEFAULT_GOOGLE_DAILY_LIMIT);
         assert!(config.check_history);
         assert_eq!(config.concurrent_batches, DEFAULT_CONCURRENT_BATCHES);
         assert!(config.progress_bar);
@@ -810,12 +860,14 @@ mod tests {
         let config = BatchConfig::new()
             .with_google_batch_size(50)
             .with_indexnow_batch_size(5000)
+            .with_google_daily_limit(200)
             .with_check_history(false)
             .with_concurrent_batches(5)
             .with_progress_bar(false);
 
         assert_eq!(config.google_batch_size, 50);
         assert_eq!(config.indexnow_batch_size, 5000);
+        assert_eq!(config.google_daily_limit, 200);
         assert!(!config.check_history);
         assert_eq!(config.concurrent_batches, 5);
         assert!(!config.progress_bar);
@@ -836,6 +888,7 @@ mod tests {
         let mut results = ApiResults::new();
         assert_eq!(results.successful, 0);
         assert_eq!(results.failed, 0);
+        assert!(results.warnings.is_empty());
 
         results.add_success();
         results.add_success();
@@ -844,6 +897,27 @@ mod tests {
         results.add_failure("Error 1".to_string());
         assert_eq!(results.failed, 1);
         assert_eq!(results.errors.len(), 1);
+
+        results.add_warning("Warning 1".to_string());
+        assert_eq!(results.warnings.len(), 1);
+    }
+
+    #[test]
+    fn test_limit_google_urls_for_run() {
+        let urls = (1..=5)
+            .map(|i| format!("https://placeholder.test/page{}", i))
+            .collect::<Vec<_>>();
+
+        let (limited, skipped) = limit_google_urls_for_run(urls, 2);
+
+        assert_eq!(
+            limited,
+            vec![
+                "https://placeholder.test/page1".to_string(),
+                "https://placeholder.test/page2".to_string(),
+            ]
+        );
+        assert_eq!(skipped, 3);
     }
 
     #[test]
