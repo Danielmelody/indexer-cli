@@ -338,18 +338,34 @@ pub async fn write_bytes(path: &Path, content: &[u8]) -> Result<()> {
 /// let path = expand_path("~/Documents/test.txt")?;
 /// # Ok::<(), anyhow::Error>(())
 /// ```
-pub fn expand_path(path_str: &str) -> Result<PathBuf> {
-    if path_str.starts_with("~/") {
-        // Expand home directory
-        let home = dirs::home_dir().context("Failed to determine home directory")?;
+pub fn user_home_dir() -> Option<PathBuf> {
+    std::env::home_dir().filter(|path| path.is_absolute())
+}
 
-        let rest = &path_str[2..]; // Skip "~/"
-        Ok(home.join(rest))
-    } else if path_str == "~" {
-        // Just the home directory
-        dirs::home_dir().context("Failed to determine home directory")
+pub(crate) fn expand_home_dir(path_str: &str, home: &Path) -> PathBuf {
+    match tilde_remainder(path_str) {
+        Some("") => home.to_path_buf(),
+        Some(rest) => home.join(rest),
+        None => PathBuf::from(path_str),
+    }
+}
+
+fn tilde_remainder(path_str: &str) -> Option<&str> {
+    let rest = path_str.strip_prefix('~')?;
+
+    if rest.is_empty() {
+        return Some(rest);
+    }
+
+    let rest = rest.strip_prefix('/').or_else(|| rest.strip_prefix('\\'))?;
+    Some(rest)
+}
+
+pub fn expand_path(path_str: &str) -> Result<PathBuf> {
+    if tilde_remainder(path_str).is_some() {
+        let home = user_home_dir().context("Failed to determine home directory")?;
+        Ok(expand_home_dir(path_str, &home))
     } else {
-        // No expansion needed
         Ok(PathBuf::from(path_str))
     }
 }
@@ -508,13 +524,16 @@ mod tests {
         assert_eq!(path, PathBuf::from("/tmp/test.txt"));
 
         // Test with ~ (if home directory is available)
-        if let Ok(home) = dirs::home_dir().ok_or("No home dir") {
+        if let Ok(home) = user_home_dir().ok_or("No home dir") {
             let path = expand_path("~/test.txt").unwrap();
             assert_eq!(path, home.join("test.txt"));
 
             let path = expand_path("~").unwrap();
             assert_eq!(path, home);
         }
+
+        let path = expand_path("~user/test.txt").unwrap();
+        assert_eq!(path, PathBuf::from("~user/test.txt"));
     }
 
     #[test]

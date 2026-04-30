@@ -1,9 +1,9 @@
 // Configuration loader
 
 use super::settings::Settings;
+use crate::utils::file::{expand_home_dir, user_home_dir};
 use anyhow::{Context, Result};
 use config::{Config, Environment, File};
-use dirs::home_dir;
 use std::path::{Path, PathBuf};
 
 /// Environment variable prefix for configuration
@@ -150,7 +150,7 @@ pub fn merge_configs(configs: Vec<Settings>) -> Result<Settings> {
 
 /// Get the path to the global configuration file
 pub fn get_global_config_path() -> Option<PathBuf> {
-    home_dir().map(|home| home.join(GLOBAL_CONFIG_FILE))
+    user_home_dir().map(|home| home.join(GLOBAL_CONFIG_FILE))
 }
 
 /// Find a project configuration file in the current directory
@@ -166,7 +166,7 @@ pub fn find_project_config() -> Option<PathBuf> {
 
 /// Get the path to the global configuration directory
 pub fn get_config_dir() -> Option<PathBuf> {
-    home_dir().map(|home| home.join(".indexer-cli"))
+    user_home_dir().map(|home| home.join(".indexer-cli"))
 }
 
 /// Ensure the global configuration directory exists
@@ -219,10 +219,8 @@ pub fn save_project_config(settings: &Settings) -> Result<PathBuf> {
 pub fn expand_tilde<P: AsRef<Path>>(path: P) -> PathBuf {
     let path = path.as_ref();
     if let Some(path_str) = path.to_str() {
-        if path_str.starts_with("~/") {
-            if let Some(home) = home_dir() {
-                return home.join(&path_str[2..]);
-            }
+        if let Some(home) = user_home_dir() {
+            return expand_home_dir(path_str, &home);
         }
     }
     path.to_path_buf()
@@ -276,9 +274,15 @@ mod tests {
     #[test]
     fn test_expand_tilde() {
         let path = expand_tilde("~/test/file.txt");
-        if let Some(home) = home_dir() {
+        if let Some(home) = user_home_dir() {
             assert_eq!(path, home.join("test/file.txt"));
+
+            let path = expand_tilde("~");
+            assert_eq!(path, home);
         }
+
+        let path = expand_tilde("~user/test/file.txt");
+        assert_eq!(path, PathBuf::from("~user/test/file.txt"));
     }
 
     #[test]

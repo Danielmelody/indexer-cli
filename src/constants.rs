@@ -353,7 +353,7 @@ pub const SUCCESS_SUBMISSION_COMPLETE: &str = "URLs submitted successfully!";
 ///
 /// Expands `~` to the user's home directory.
 pub fn default_config_dir() -> std::path::PathBuf {
-    let home = dirs::home_dir().expect("Unable to determine home directory");
+    let home = crate::utils::file::user_home_dir().expect("Unable to determine home directory");
     home.join(DEFAULT_CONFIG_DIR_NAME)
 }
 
